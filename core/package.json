@@ -1,0 +1,37 @@
+{
+  "name": "@jubbio/core",
+  "version": "1.0.0",
+  "description": "Core library for Jubbio bots",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": ["jubbio", "bot", "gateway", "api", "realtime", "chat"],
+  "author": "Jubbio Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jubbio/jubbio.js.git",
+    "directory": "core"
+  },
+  "homepage": "https://github.com/jubbio/jubbio.js#readme",
+  "bugs": {
+    "url": "https://github.com/jubbio/jubbio.js/issues"
+  },
+  "dependencies": {
+    "ws": "^8.14.0",
+    "form-data": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "@types/ws": "^8.5.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

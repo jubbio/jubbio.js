@@ -1,0 +1,43 @@
+{
+  "name": "@jubbio/voice",
+  "version": "1.0.0",
+  "description": "Voice library for Jubbio bots with LiveKit backend",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": ["jubbio", "voice", "bot", "livekit", "audio", "streaming"],
+  "author": "Jubbio Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jubbio/jubbio.js.git",
+    "directory": "voice"
+  },
+  "homepage": "https://github.com/jubbio/jubbio.js#readme",
+  "bugs": {
+    "url": "https://github.com/jubbio/jubbio.js/issues"
+  },
+  "peerDependencies": {
+    "@jubbio/core": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@jubbio/core": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@livekit/rtc-node": "^0.12.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

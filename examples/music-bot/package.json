@@ -1,0 +1,19 @@
+{
+  "name": "jubbio-music-bot-example",
+  "version": "1.0.0",
+  "description": "Example music bot using @jubbio/core and @jubbio/voice",
+  "main": "index.ts",
+  "scripts": {
+    "start": "ts-node index.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@jubbio/core": "file:../../core",
+    "@jubbio/voice": "file:../../voice"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "ts-node": "^10.9.0",
+    "@types/node": "^20.0.0"
+  }
+}
