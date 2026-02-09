@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://cdn.jubbio.com/assets/logo/jubbio-logo.png" alt="Jubbio" width="120" />
+  <img src="https://cdn.jubbio.com/assets/logo/jubbio-logo.png" alt="Jubbio" width="70" />
 </p>
 
 <h1 align="center">@jubbio/core</h1>
