@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://jubbio.com/logo.png" alt="Jubbio" width="120" />
+  <img src="https://cdn.jubbio.com/assets/logo/jubbio-logo.png" alt="Jubbio" width="120" />
 </p>
 
 <h1 align="center">@jubbio/voice</h1>
