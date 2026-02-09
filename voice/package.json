@@ -1,6 +1,6 @@
 {
   "name": "@jubbio/voice",
-  "version": "1.0.5",
+  "version": "1.0.7",
   "description": "Voice library for Jubbio bots with LiveKit backend",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

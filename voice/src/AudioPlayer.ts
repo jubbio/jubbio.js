@@ -74,6 +74,14 @@ export class AudioPlayer extends EventEmitter {
         ...options.behaviors
       }
     };
+    
+    // Add default error handler to prevent crashes
+    this.on('error', (error) => {
+      // Default handler - just log if no other listeners
+      if (this.listenerCount('error') === 1) {
+        console.error('[AudioPlayer] Error:', error.message);
+      }
+    });
   }
 
   /**
@@ -175,8 +183,10 @@ export class AudioPlayer extends EventEmitter {
       // Start FFmpeg to decode audio - this will set state to Playing when ready
       await this.startFFmpeg();
     } catch (error) {
+      // Emit error but don't stop - let user decide what to do
       this.emit('error', { message: (error as Error).message, resource: this.currentResource });
-      this.stop();
+      // Reset to idle state without full cleanup
+      this.setState({ status: AudioPlayerStatus.Idle });
     }
   }
 
@@ -234,6 +244,8 @@ export class AudioPlayer extends EventEmitter {
         const ytdlpCmd = `${ytDlpPath} -f bestaudio/best -o - --no-playlist --no-warnings --default-search ytsearch "${inputSource}"`;
         const ffmpegCmd = `ffmpeg -i pipe:0 -f s16le -ar ${SAMPLE_RATE} -ac ${CHANNELS} -acodec pcm_s16le -`;
         
+        console.log('[AudioPlayer] yt-dlp command:', ytdlpCmd);
+        
         // Spawn yt-dlp with shell command
         const ytdlpProcess = spawn(ytdlpCmd, [], { 
           stdio: ['pipe', 'pipe', 'pipe'],
@@ -249,16 +261,16 @@ export class AudioPlayer extends EventEmitter {
         // Pipe yt-dlp stdout to ffmpeg stdin
         ytdlpProcess.stdout?.pipe(this.ffmpegProcess.stdin!);
         
-        // Handle yt-dlp errors
+        // Handle yt-dlp stderr - log everything for debugging
         ytdlpProcess.stderr?.on('data', (data: Buffer) => {
-          const msg = data.toString();
-          if (msg.includes('ERROR')) {
-            console.error('yt-dlp error:', msg);
+          const msg = data.toString().trim();
+          if (msg) {
+            console.log('[yt-dlp]', msg);
           }
         });
         
         ytdlpProcess.on('error', (err) => {
-          console.error('yt-dlp process error:', err.message);
+          console.error('[yt-dlp] process error:', err.message);
         });
         
         ytdlpProcess.on('close', (code) => {

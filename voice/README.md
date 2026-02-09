@@ -39,6 +39,7 @@ import {
   createAudioPlayer, 
   createAudioResourceFromUrl,
   probeAudioInfo,
+  getVoiceConnection,
   AudioPlayerStatus 
 } from '@jubbio/voice';
 
@@ -48,6 +49,18 @@ const client = new Client({
     GatewayIntentBits.GuildVoiceStates
   ]
 });
+
+// Store players per guild
+const players = new Map();
+
+function getPlayer(guildId) {
+  let player = players.get(guildId);
+  if (!player) {
+    player = createAudioPlayer();
+    players.set(guildId, player);
+  }
+  return player;
+}
 
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isCommand()) return;
@@ -60,33 +73,32 @@ client.on('interactionCreate', async (interaction) => {
       return interaction.reply('❌ Join a voice channel first!');
     }
     
-    // Defer reply while fetching song info
     await interaction.deferReply();
     
     try {
-      // Get song info
       const info = await probeAudioInfo(url);
       
-      // Join voice channel
-      const connection = joinVoiceChannel({
-        channelId: voiceChannel,
-        guildId: interaction.guildId,
-        adapterCreator: client.voice.adapters.get(interaction.guildId)
-      });
+      // Check for existing connection, only join if not connected
+      let connection = getVoiceConnection(interaction.guildId);
+      if (!connection) {
+        connection = joinVoiceChannel({
+          channelId: voiceChannel,
+          guildId: interaction.guildId,
+          adapterCreator: client.voice.adapters.get(interaction.guildId)
+        });
+        
+        const player = getPlayer(interaction.guildId);
+        connection.subscribe(player);
+      }
       
-      // Create player and play
-      const player = createAudioPlayer();
+      const player = getPlayer(interaction.guildId);
       const resource = createAudioResourceFromUrl(info.url);
-      
-      connection.subscribe(player);
       player.play(resource);
       
-      // Format duration
       const minutes = Math.floor(info.duration / 60);
       const seconds = info.duration % 60;
       const durationStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
       
-      // Create embed with song info
       const embed = new EmbedBuilder()
         .setTitle('🎵 Now Playing')
         .setDescription(`**${info.title}**`)

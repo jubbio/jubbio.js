@@ -149,8 +149,11 @@ export async function probeAudioInfo(input: string, ytDlpPath?: string): Promise
     let ytdlp: ReturnType<typeof spawn>;
     
     if (isWindows) {
-      // Windows: use shell with quoted command
-      const cmd = `${ytdlpBin} --no-playlist --no-warnings -j "${searchQuery}"`;
+      // Windows: escape special characters and use shell
+      // Replace double quotes with escaped version for cmd
+      const escapedQuery = searchQuery.replace(/"/g, '\\"');
+      const cmd = `${ytdlpBin} --no-playlist --no-warnings -j "${escapedQuery}"`;
+      console.log('[probeAudioInfo] Running:', cmd);
       ytdlp = spawn(cmd, [], { shell: true });
     } else {
       // Unix: use bash -c with quoted string
@@ -173,7 +176,12 @@ export async function probeAudioInfo(input: string, ytDlpPath?: string): Promise
     
     ytdlp.on('close', (code) => {
       if (code !== 0) {
-        reject(new Error(`Failed to probe audio info: ${stderr || 'Unknown error'}`));
+        reject(new Error(`yt-dlp failed (code ${code}): ${stderr || 'Unknown error'}`));
+        return;
+      }
+      
+      if (!stdout.trim()) {
+        reject(new Error(`yt-dlp returned empty response. stderr: ${stderr}`));
         return;
       }
       
@@ -186,7 +194,7 @@ export async function probeAudioInfo(input: string, ytDlpPath?: string): Promise
           url: info.webpage_url || info.url || input
         });
       } catch (e) {
-        reject(new Error(`Failed to parse audio info: ${(e as Error).message}`));
+        reject(new Error(`Failed to parse yt-dlp output: ${stdout.substring(0, 200)}`));
       }
     });
     
