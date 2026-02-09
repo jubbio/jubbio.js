@@ -62,8 +62,8 @@ client.on('interactionCreate', async (interaction) => {
     // Join voice channel
     const connection = joinVoiceChannel({
       channelId: voiceChannel,
-      guildId: interaction.guildId!,
-      adapterCreator: client.voice.adapters.get(interaction.guildId!)!
+      guildId: interaction.guildId,
+      adapterCreator: client.voice.adapters.get(interaction.guildId)
     });
     
     // Create player and play

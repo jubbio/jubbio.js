@@ -211,10 +211,17 @@ export class AudioPlayer extends EventEmitter {
     if (needsYtDlp) {
       // Use yt-dlp to pipe audio directly to FFmpeg
       console.log('Using yt-dlp pipe mode');
-      this.ffmpegProcess = spawn('bash', [
-        '-c',
-        `~/.local/bin/yt-dlp -f "bestaudio/best" -o - --no-playlist --no-warnings "${inputSource}" | ffmpeg -i pipe:0 -f s16le -ar ${SAMPLE_RATE} -ac ${CHANNELS} -acodec pcm_s16le -`
-      ], { stdio: ['pipe', 'pipe', 'pipe'] });
+      
+      // Detect platform and use appropriate shell
+      const isWindows = process.platform === 'win32';
+      const ytDlpPath = isWindows ? 'yt-dlp' : '~/.local/bin/yt-dlp';
+      const command = `${ytDlpPath} -f "bestaudio/best" -o - --no-playlist --no-warnings "${inputSource}" | ffmpeg -i pipe:0 -f s16le -ar ${SAMPLE_RATE} -ac ${CHANNELS} -acodec pcm_s16le -`;
+      
+      if (isWindows) {
+        this.ffmpegProcess = spawn('cmd', ['/c', command], { stdio: ['pipe', 'pipe', 'pipe'] });
+      } else {
+        this.ffmpegProcess = spawn('bash', ['-c', command], { stdio: ['pipe', 'pipe', 'pipe'] });
+      }
     } else {
       console.log('Using direct FFmpeg mode');
       this.ffmpegProcess = spawn('ffmpeg', [

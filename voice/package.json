@@ -1,16 +1,27 @@
 {
   "name": "@jubbio/voice",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Voice library for Jubbio bots with LiveKit backend",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build"
   },
-  "keywords": ["jubbio", "voice", "bot", "livekit", "audio", "streaming"],
+  "keywords": [
+    "jubbio",
+    "voice",
+    "bot",
+    "livekit",
+    "audio",
+    "streaming"
+  ],
   "author": "Jubbio Team",
   "license": "MIT",
   "repository": {

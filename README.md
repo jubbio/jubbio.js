@@ -109,8 +109,8 @@ client.on('interactionCreate', async (interaction) => {
     
     const connection = joinVoiceChannel({
       channelId: voiceChannel,
-      guildId: interaction.guildId!,
-      adapterCreator: client.voice.adapters.get(interaction.guildId!)!
+      guildId: interaction.guildId,
+      adapterCreator: client.voice.adapters.get(interaction.guildId)
     });
     
     const player = createAudioPlayer();
