@@ -1,6 +1,20 @@
-# @jubbio/core
+<p align="center">
+  <img src="https://jubbio.com/logo.png" alt="Jubbio" width="120" />
+</p>
 
-Official bot library for Jubbio platform. Build powerful bots with an intuitive API.
+<h1 align="center">@jubbio/core</h1>
+
+<p align="center">
+  <strong>Core bot library for Jubbio platform</strong>
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/@jubbio/core"><img src="https://img.shields.io/npm/v/@jubbio/core?color=blue" alt="npm"></a>
+  <a href="https://github.com/jubbio/jubbio.js/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
+  <img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen" alt="Node.js">
+</p>
+
+---
 
 ## Installation
 
@@ -16,30 +30,124 @@ import { Client, GatewayIntentBits } from '@jubbio/core';
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.GuildVoiceStates
+    GatewayIntentBits.GuildMessages
   ]
 });
 
 client.on('ready', () => {
-  console.log(`Logged in as ${client.user?.username}!`);
+  console.log(`✅ ${client.user?.username} is online!`);
 });
 
 client.on('messageCreate', async (message) => {
   if (message.content === '!ping') {
-    await message.reply('Pong!');
+    await message.reply('🏓 Pong!');
   }
 });
 
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isCommand()) return;
   
-  if (interaction.commandName === 'ping') {
-    await interaction.reply('Pong!');
+  if (interaction.commandName === 'hello') {
+    await interaction.reply('Hello! 👋');
   }
 });
 
-client.login('YOUR_BOT_TOKEN');
+client.login(process.env.BOT_TOKEN);
+```
+
+## Features
+
+- 🔌 **WebSocket Gateway** - Real-time events with auto-reconnection
+- 🌐 **REST API Client** - Full API coverage
+- ⚡ **Slash Commands** - Easy interaction handling
+- 📦 **Builders** - Embed, Button, SelectMenu, Modal builders
+- 🔄 **Collectors** - Message and interaction collectors
+- 🎯 **Sharding** - Multi-process support for large bots
+- 📝 **TypeScript** - Full type definitions
+
+## Client Options
+
+```typescript
+const client = new Client({
+  intents: [...],           // Required gateway intents
+  shards: [0, 1],           // Optional: [shard_id, total_shards]
+  gatewayUrl: 'ws://...',   // Optional: Custom gateway URL
+  apiUrl: 'http://...'      // Optional: Custom API URL
+});
+```
+
+## Gateway Intents
+
+```typescript
+GatewayIntentBits.Guilds              // Guild events
+GatewayIntentBits.GuildMembers        // Member events  
+GatewayIntentBits.GuildMessages       // Message events
+GatewayIntentBits.GuildVoiceStates    // Voice state events
+GatewayIntentBits.MessageContent      // Message content access
+```
+
+## Events
+
+| Event | Description |
+|-------|-------------|
+| `ready` | Bot is connected and ready |
+| `messageCreate` | New message received |
+| `interactionCreate` | Slash command or component interaction |
+| `guildCreate` | Bot joined a guild |
+| `guildDelete` | Bot left a guild |
+| `voiceStateUpdate` | Voice state changed |
+| `error` | Error occurred |
+| `debug` | Debug information |
+
+## Builders
+
+### EmbedBuilder
+
+```typescript
+import { EmbedBuilder, Colors } from '@jubbio/core';
+
+const embed = new EmbedBuilder()
+  .setTitle('Hello!')
+  .setDescription('This is an embed')
+  .setColor(Colors.Blue)
+  .addFields(
+    { name: 'Field 1', value: 'Value 1', inline: true },
+    { name: 'Field 2', value: 'Value 2', inline: true }
+  )
+  .setFooter({ text: 'Footer text' })
+  .setTimestamp();
+
+await message.reply({ embeds: [embed] });
+```
+
+### ButtonBuilder
+
+```typescript
+import { ButtonBuilder, ButtonStyle, ActionRowBuilder } from '@jubbio/core';
+
+const button = new ButtonBuilder()
+  .setCustomId('my-button')
+  .setLabel('Click me!')
+  .setStyle(ButtonStyle.Primary);
+
+const row = new ActionRowBuilder().addComponents(button);
+
+await interaction.reply({ components: [row] });
+```
+
+### SlashCommandBuilder
+
+```typescript
+import { SlashCommandBuilder } from '@jubbio/core';
+
+const command = new SlashCommandBuilder()
+  .setName('greet')
+  .setDescription('Greet a user')
+  .addUserOption(option =>
+    option.setName('user')
+      .setDescription('User to greet')
+      .setRequired(true)
+  );
 ```
 
 ## Voice Support
@@ -48,104 +156,11 @@ Use with `@jubbio/voice` for voice channel support:
 
 ```typescript
 import { Client, GatewayIntentBits } from '@jubbio/core';
-import { joinVoiceChannel, createAudioPlayer, createAudioResourceFromUrl } from '@jubbio/voice';
+import { joinVoiceChannel, createAudioPlayer } from '@jubbio/voice';
 
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildVoiceStates
-  ]
-});
-
-client.on('interactionCreate', async (interaction) => {
-  if (!interaction.isCommand()) return;
-  
-  if (interaction.commandName === 'play') {
-    const url = interaction.options.getString('url', true);
-    const voiceChannel = interaction.member?.voice.channelId;
-    
-    if (!voiceChannel) {
-      return interaction.reply('You need to be in a voice channel!');
-    }
-    
-    // Join voice channel
-    const connection = joinVoiceChannel({
-      channelId: voiceChannel,
-      guildId: interaction.guildId!,
-      adapterCreator: client.voice.adapters.get(interaction.guildId!)!
-    });
-    
-    // Create player and play
-    const player = createAudioPlayer();
-    const resource = createAudioResourceFromUrl(url);
-    
-    player.play(resource);
-    connection.subscribe(player);
-    
-    await interaction.reply(`Now playing!`);
-  }
-});
-
-client.login('YOUR_BOT_TOKEN');
+// See @jubbio/voice documentation for full voice support
 ```
-
-## API Reference
-
-### Client
-
-The main client class for connecting to the Jubbio gateway.
-
-```typescript
-const client = new Client({
-  intents: [...],      // Required intents
-  shards: [0, 1],      // Optional: [shard_id, num_shards]
-  gatewayUrl: '...',   // Optional: Custom gateway URL
-  apiUrl: '...'        // Optional: Custom API URL
-});
-```
-
-#### Events
-
-- `ready` - Emitted when the client is ready
-- `messageCreate` - Emitted when a message is created
-- `interactionCreate` - Emitted when an interaction is created
-- `guildCreate` - Emitted when the bot joins a guild
-- `guildDelete` - Emitted when the bot leaves a guild
-- `voiceStateUpdate` - Emitted when a voice state changes
-- `error` - Emitted on errors
-- `debug` - Emitted for debug information
-
-### Structures
-
-Available structures:
-
-- `User` - Represents a user
-- `Guild` - Represents a guild
-- `GuildMember` - Represents a guild member
-- `Message` - Represents a message
-- `Interaction` - Base interaction class
-- `CommandInteraction` - Slash command interaction
-- `AutocompleteInteraction` - Autocomplete interaction
-- `Collection` - Extended Map with utility methods
-
-### Enums
-
-- `GatewayIntentBits` - Gateway intents
-- `InteractionType` - Interaction types
-- `ApplicationCommandType` - Command types
-- `ApplicationCommandOptionType` - Option types
-- `ChannelType` - Channel types
-- `MessageFlags` - Message flags
-
-## Features
-
-- Full gateway connection with automatic reconnection
-- REST API client for all endpoints
-- Slash commands and interactions support
-- Message collectors and reaction collectors
-- Sharding support for large bots
-- Voice channel integration with `@jubbio/voice`
 
 ## License
 
-MIT
+MIT © [Jubbio Team](https://jubbio.com)

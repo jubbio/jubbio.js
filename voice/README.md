@@ -1,6 +1,20 @@
-# @jubbio/voice
+<p align="center">
+  <img src="https://jubbio.com/logo.png" alt="Jubbio" width="120" />
+</p>
 
-Voice library for Jubbio bots. Powered by LiveKit for high-quality audio streaming.
+<h1 align="center">@jubbio/voice</h1>
+
+<p align="center">
+  <strong>Voice library for Jubbio bots</strong>
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/@jubbio/voice"><img src="https://img.shields.io/npm/v/@jubbio/voice?color=blue" alt="npm"></a>
+  <a href="https://github.com/jubbio/jubbio.js/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
+  <img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen" alt="Node.js">
+</p>
+
+---
 
 ## Installation
 
@@ -8,116 +22,236 @@ Voice library for Jubbio bots. Powered by LiveKit for high-quality audio streami
 npm install @jubbio/voice
 ```
 
-## Usage
+## Features
 
-Simple and intuitive API for voice functionality:
+- 🎵 **Audio Playback** - Play local files or stream from URLs
+- 📺 **YouTube Support** - Built-in yt-dlp integration
+- 🔊 **LiveKit Backend** - High-quality, low-latency audio
+- ⏯️ **Playback Controls** - Play, pause, stop, volume
+- 📊 **Easy Queue Management** - Build music bots easily
+
+## Quick Start
 
 ```typescript
+import { Client, GatewayIntentBits } from '@jubbio/core';
 import { 
   joinVoiceChannel, 
   createAudioPlayer, 
-  createAudioResource,
   createAudioResourceFromUrl,
-  AudioPlayerStatus,
-  VoiceConnectionStatus
+  AudioPlayerStatus 
 } from '@jubbio/voice';
 
-// Join a voice channel
-const connection = joinVoiceChannel({
-  channelId: '123456789',
-  guildId: '987654321',
-  adapterCreator: client.voice.adapters.get('987654321')
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildVoiceStates
+  ]
 });
 
-// Create an audio player
-const player = createAudioPlayer();
-
-// Subscribe the connection to the player
-connection.subscribe(player);
-
-// Play a local file
-const resource = createAudioResource('/path/to/audio.mp3');
-player.play(resource);
-
-// Or play from YouTube (uses yt-dlp)
-const ytResource = createAudioResourceFromUrl('https://youtube.com/watch?v=...', {
-  useYtDlp: true
-});
-player.play(ytResource);
-
-// Listen for events
-player.on('stateChange', (oldState, newState) => {
-  if (newState.status === AudioPlayerStatus.Idle) {
-    console.log('Playback finished!');
+client.on('interactionCreate', async (interaction) => {
+  if (!interaction.isCommand()) return;
+  
+  if (interaction.commandName === 'play') {
+    const url = interaction.options.getString('url', true);
+    const voiceChannel = interaction.member?.voice?.channelId;
+    
+    if (!voiceChannel) {
+      return interaction.reply('❌ Join a voice channel first!');
+    }
+    
+    // Join voice channel
+    const connection = joinVoiceChannel({
+      channelId: voiceChannel,
+      guildId: interaction.guildId!,
+      adapterCreator: client.voice.adapters.get(interaction.guildId!)!
+    });
+    
+    // Create player and play
+    const player = createAudioPlayer();
+    const resource = createAudioResourceFromUrl(url);
+    
+    connection.subscribe(player);
+    player.play(resource);
+    
+    // Handle playback end
+    player.on('stateChange', (oldState, newState) => {
+      if (newState.status === AudioPlayerStatus.Idle) {
+        console.log('Playback finished!');
+      }
+    });
+    
+    await interaction.reply('🎵 Now playing!');
   }
 });
 
+client.login(process.env.BOT_TOKEN);
+```
+
+## API Reference
+
+### joinVoiceChannel(options)
+
+Join a voice channel and return a `VoiceConnection`.
+
+```typescript
+const connection = joinVoiceChannel({
+  channelId: '123456789',        // Voice channel ID
+  guildId: '987654321',          // Guild ID
+  adapterCreator: adapter,       // From client.voice.adapters
+  selfMute: false,               // Join muted (default: false)
+  selfDeaf: false                // Join deafened (default: false)
+});
+```
+
+### createAudioPlayer(options?)
+
+Create an `AudioPlayer` instance.
+
+```typescript
+const player = createAudioPlayer({
+  behaviors: {
+    noSubscriber: 'pause'  // 'pause' | 'play' | 'stop'
+  }
+});
+```
+
+### createAudioResource(input, options?)
+
+Create an `AudioResource` from a file path.
+
+```typescript
+const resource = createAudioResource('/path/to/audio.mp3', {
+  metadata: { title: 'My Song' }
+});
+```
+
+### createAudioResourceFromUrl(url, options?)
+
+Create an `AudioResource` from a URL (YouTube, SoundCloud, etc.).
+
+```typescript
+const resource = createAudioResourceFromUrl('https://youtube.com/watch?v=...', {
+  metadata: { title: 'YouTube Video' }
+});
+```
+
+### probeAudioInfo(url)
+
+Get information about an audio URL.
+
+```typescript
+const info = await probeAudioInfo('https://youtube.com/watch?v=...');
+console.log(info.title);     // Video title
+console.log(info.duration);  // Duration in seconds
+console.log(info.thumbnail); // Thumbnail URL
+```
+
+## Player Controls
+
+```typescript
+// Play
+player.play(resource);
+
+// Pause
+player.pause();
+
+// Resume
+player.unpause();
+
+// Stop
+player.stop();
+
+// Check status
+if (player.state.status === AudioPlayerStatus.Playing) {
+  console.log('Currently playing!');
+}
+```
+
+## Connection Controls
+
+```typescript
+// Disconnect
+connection.disconnect();
+
+// Destroy (cleanup)
+connection.destroy();
+
+// Check status
+if (connection.state.status === VoiceConnectionStatus.Ready) {
+  console.log('Connected!');
+}
+```
+
+## Events
+
+### AudioPlayer Events
+
+```typescript
+player.on('stateChange', (oldState, newState) => {
+  console.log(`${oldState.status} -> ${newState.status}`);
+});
+
+player.on('error', (error) => {
+  console.error('Player error:', error);
+});
+```
+
+### VoiceConnection Events
+
+```typescript
 connection.on('stateChange', (oldState, newState) => {
   if (newState.status === VoiceConnectionStatus.Disconnected) {
     console.log('Disconnected from voice channel');
   }
 });
 
-// Control playback
-player.pause();
-player.unpause();
-player.stop();
-
-// Disconnect
-connection.disconnect();
+connection.on('error', (error) => {
+  console.error('Connection error:', error);
+});
 ```
 
-## API Reference
+## Status Enums
 
-### `joinVoiceChannel(options)`
+### AudioPlayerStatus
 
-Join a voice channel and return a `VoiceConnection`.
+| Status | Description |
+|--------|-------------|
+| `Idle` | Not playing anything |
+| `Buffering` | Loading audio |
+| `Playing` | Currently playing |
+| `Paused` | Playback paused |
+| `AutoPaused` | Paused (no subscribers) |
 
-Options:
-- `channelId` - The voice channel ID
-- `guildId` - The guild ID
-- `adapterCreator` - Gateway adapter creator from your bot client
-- `selfMute` - Whether to join muted (default: false)
-- `selfDeaf` - Whether to join deafened (default: false)
+### VoiceConnectionStatus
 
-### `createAudioPlayer(options?)`
-
-Create an `AudioPlayer` instance.
-
-Options:
-- `behaviors.noSubscriber` - What to do when no connections are subscribed: `'pause'`, `'play'`, or `'stop'`
-
-### `createAudioResource(input, options?)`
-
-Create an `AudioResource` from a file path or URL.
-
-### `createAudioResourceFromUrl(url, options?)`
-
-Create an `AudioResource` from a streaming URL (YouTube, SoundCloud, etc.).
-Automatically uses yt-dlp to extract the audio URL.
-
-Options:
-- `useYtDlp` - Whether to use yt-dlp (default: true for streaming URLs)
-- `ytDlpPath` - Path to yt-dlp binary (default: 'yt-dlp')
-- `metadata` - Custom metadata to attach to the resource
-
-### `probeAudioInfo(url)`
-
-Get information about an audio URL (title, duration, thumbnail).
-
-## Architecture
-
-- Uses LiveKit for real-time audio streaming
-- FFmpeg for audio processing and format conversion
-- yt-dlp integration for YouTube and streaming services
+| Status | Description |
+|--------|-------------|
+| `Connecting` | Establishing connection |
+| `Ready` | Connected and ready |
+| `Disconnected` | Disconnected |
+| `Destroyed` | Connection destroyed |
+| `Signalling` | Exchanging connection info |
 
 ## Requirements
 
-- Node.js 18+
-- FFmpeg installed and in PATH
-- yt-dlp installed (for YouTube/streaming support)
-- LiveKit server (provided by Jubbio backend)
+- **Node.js** 18.0.0 or higher
+- **FFmpeg** installed and in PATH
+- **yt-dlp** installed (for YouTube support)
+
+### Installing Dependencies
+
+```bash
+# Ubuntu/Debian
+sudo apt install ffmpeg
+pip install yt-dlp
+
+# macOS
+brew install ffmpeg yt-dlp
+
+# Windows
+# Download from ffmpeg.org and yt-dlp GitHub releases
+```
 
 ## License
 
-MIT
+MIT © [Jubbio Team](https://jubbio.com)
