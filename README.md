@@ -80,12 +80,13 @@ client.login(process.env.BOT_TOKEN);
 
 ### Music Bot
 
-```typescript
-import { Client, GatewayIntentBits } from '@jubbio/core';
+```javascript
+import { Client, GatewayIntentBits, EmbedBuilder, Colors } from '@jubbio/core';
 import { 
   joinVoiceChannel, 
   createAudioPlayer, 
   createAudioResourceFromUrl,
+  probeAudioInfo,
   AudioPlayerStatus 
 } from '@jubbio/voice';
 
@@ -107,19 +108,44 @@ client.on('interactionCreate', async (interaction) => {
       return interaction.reply('❌ Join a voice channel first!');
     }
     
-    const connection = joinVoiceChannel({
-      channelId: voiceChannel,
-      guildId: interaction.guildId,
-      adapterCreator: client.voice.adapters.get(interaction.guildId)
-    });
+    await interaction.deferReply();
     
-    const player = createAudioPlayer();
-    const resource = createAudioResourceFromUrl(url);
-    
-    connection.subscribe(player);
-    player.play(resource);
-    
-    await interaction.reply('🎵 Now playing!');
+    try {
+      // Get song info
+      const info = await probeAudioInfo(url);
+      
+      const connection = joinVoiceChannel({
+        channelId: voiceChannel,
+        guildId: interaction.guildId,
+        adapterCreator: client.voice.adapters.get(interaction.guildId)
+      });
+      
+      const player = createAudioPlayer();
+      const resource = createAudioResourceFromUrl(info.url);
+      
+      connection.subscribe(player);
+      player.play(resource);
+      
+      // Format duration
+      const minutes = Math.floor(info.duration / 60);
+      const seconds = info.duration % 60;
+      const durationStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      
+      const embed = new EmbedBuilder()
+        .setTitle('🎵 Now Playing')
+        .setDescription(`**${info.title}**`)
+        .setColor(Colors.Blue)
+        .addFields({ name: 'Duration', value: durationStr, inline: true })
+        .setTimestamp();
+      
+      if (info.thumbnail) {
+        embed.setThumbnail(info.thumbnail);
+      }
+      
+      await interaction.editReply({ embeds: [embed] });
+    } catch (error) {
+      await interaction.editReply(`❌ Error: ${error.message}`);
+    }
   }
 });
 
