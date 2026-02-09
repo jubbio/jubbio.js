@@ -40,7 +40,7 @@ export class REST {
   private userCache: Map<number, CachedUser> = new Map();
   private readonly USER_CACHE_TTL = 5 * 60 * 1000; // 5 dakika
 
-  constructor(baseUrl: string = 'http://localhost:5000/api/v1') {
+  constructor(baseUrl: string = 'https://gateway.jubbio.com/api/v1') {
     this.baseUrl = baseUrl;
   }
 

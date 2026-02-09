@@ -87,7 +87,7 @@ export class Client extends EventEmitter {
   constructor(options: ClientOptions) {
     super();
     this.options = options;
-    this.gatewayUrl = options.gatewayUrl || 'ws://localhost:5003/ws/bot';
+    this.gatewayUrl = options.gatewayUrl || 'wss://realtime.jubbio.com/ws/bot';
     this.rest = new REST(options.apiUrl);
     
     // Initialize voice adapter system
