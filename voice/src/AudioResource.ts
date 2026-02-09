@@ -129,32 +129,45 @@ function isValidUrl(input: string): boolean {
  * Probe audio info from a URL or search query
  * If input is not a URL, it will search YouTube
  */
-export async function probeAudioInfo(input: string, ytDlpPath = '~/.local/bin/yt-dlp'): Promise<{
+export async function probeAudioInfo(input: string, ytDlpPath?: string): Promise<{
   title: string;
   duration: number;
   thumbnail?: string;
   url: string;
 }> {
   return new Promise((resolve, reject) => {
+    const isWindows = process.platform === 'win32';
+    const defaultYtDlpPath = isWindows ? 'yt-dlp' : '~/.local/bin/yt-dlp';
+    const ytdlpBin = ytDlpPath || defaultYtDlpPath;
+    
     // If not a valid URL, treat as YouTube search
     let searchQuery = input;
     if (!isValidUrl(input)) {
       searchQuery = `ytsearch1:${input}`;
     }
     
-    const ytdlp = spawn('bash', [
-      '-c',
-      `${ytDlpPath} --no-playlist --no-warnings -j "${searchQuery}"`
-    ]);
+    let ytdlp: ReturnType<typeof spawn>;
+    
+    if (isWindows) {
+      // Windows: use shell with quoted command
+      const cmd = `${ytdlpBin} --no-playlist --no-warnings -j "${searchQuery}"`;
+      ytdlp = spawn(cmd, [], { shell: true });
+    } else {
+      // Unix: use bash -c with quoted string
+      ytdlp = spawn('bash', [
+        '-c',
+        `${ytdlpBin} --no-playlist --no-warnings -j "${searchQuery}"`
+      ]);
+    }
     
     let stdout = '';
     let stderr = '';
     
-    ytdlp.stdout.on('data', (data) => {
+    ytdlp.stdout?.on('data', (data) => {
       stdout += data.toString();
     });
     
-    ytdlp.stderr.on('data', (data) => {
+    ytdlp.stderr?.on('data', (data) => {
       stderr += data.toString();
     });
     

@@ -198,29 +198,126 @@ export class AudioPlayer extends EventEmitter {
   private async startFFmpeg(): Promise<void> {
     if (!this.currentResource) return;
     
-    const inputSource = this.currentResource.getInputSource();
+    let inputSource = this.currentResource.getInputSource();
     console.log(`FFmpeg input source: ${inputSource.substring(0, 100)}...`);
+    
+    // Check if input is a URL or search query
+    const isUrl = inputSource.startsWith('http://') || 
+                  inputSource.startsWith('https://') || 
+                  inputSource.startsWith('ytsearch:');
+    
+    // If not a URL, treat as YouTube search
+    if (!isUrl) {
+      inputSource = `ytsearch1:${inputSource}`;
+      console.log(`Converted to YouTube search: ${inputSource}`);
+    }
     
     // Check if this is a streaming URL that needs yt-dlp
     const needsYtDlp = inputSource.includes('youtube.com') || 
                        inputSource.includes('youtu.be') ||
                        inputSource.includes('soundcloud.com') ||
                        inputSource.includes('twitch.tv') ||
-                       inputSource.startsWith('ytsearch:');
+                       inputSource.startsWith('ytsearch');
     
     if (needsYtDlp) {
       // Use yt-dlp to pipe audio directly to FFmpeg
       console.log('Using yt-dlp pipe mode');
       
-      // Detect platform and use appropriate shell
+      // Detect platform
       const isWindows = process.platform === 'win32';
       const ytDlpPath = isWindows ? 'yt-dlp' : '~/.local/bin/yt-dlp';
-      const command = `${ytDlpPath} -f "bestaudio/best" -o - --no-playlist --no-warnings "${inputSource}" | ffmpeg -i pipe:0 -f s16le -ar ${SAMPLE_RATE} -ac ${CHANNELS} -acodec pcm_s16le -`;
       
+      // On Windows with shell mode, we need to use a single command string
+      // to preserve spaces in the search query
       if (isWindows) {
-        this.ffmpegProcess = spawn('cmd', ['/c', command], { stdio: ['pipe', 'pipe', 'pipe'] });
+        // Build command as single string with proper quoting
+        const ytdlpCmd = `${ytDlpPath} -f bestaudio/best -o - --no-playlist --no-warnings --default-search ytsearch "${inputSource}"`;
+        const ffmpegCmd = `ffmpeg -i pipe:0 -f s16le -ar ${SAMPLE_RATE} -ac ${CHANNELS} -acodec pcm_s16le -`;
+        
+        // Spawn yt-dlp with shell command
+        const ytdlpProcess = spawn(ytdlpCmd, [], { 
+          stdio: ['pipe', 'pipe', 'pipe'],
+          shell: true
+        });
+        
+        // Spawn ffmpeg with shell command
+        this.ffmpegProcess = spawn(ffmpegCmd, [], { 
+          stdio: ['pipe', 'pipe', 'pipe'],
+          shell: true
+        });
+        
+        // Pipe yt-dlp stdout to ffmpeg stdin
+        ytdlpProcess.stdout?.pipe(this.ffmpegProcess.stdin!);
+        
+        // Handle yt-dlp errors
+        ytdlpProcess.stderr?.on('data', (data: Buffer) => {
+          const msg = data.toString();
+          if (msg.includes('ERROR')) {
+            console.error('yt-dlp error:', msg);
+          }
+        });
+        
+        ytdlpProcess.on('error', (err) => {
+          console.error('yt-dlp process error:', err.message);
+        });
+        
+        ytdlpProcess.on('close', (code) => {
+          if (code !== 0) {
+            console.error(`yt-dlp exited with code ${code}`);
+          }
+        });
       } else {
-        this.ffmpegProcess = spawn('bash', ['-c', command], { stdio: ['pipe', 'pipe', 'pipe'] });
+        // Unix: use args array (no shell needed)
+        const ytdlpArgs = [
+          '-f', 'bestaudio/best',
+          '-o', '-',
+          '--no-playlist',
+          '--no-warnings',
+          '--default-search', 'ytsearch',
+          inputSource
+        ];
+        
+        const ffmpegArgs = [
+          '-i', 'pipe:0',
+          '-f', 's16le',
+          '-ar', String(SAMPLE_RATE),
+          '-ac', String(CHANNELS),
+          '-acodec', 'pcm_s16le',
+          '-'
+        ];
+        
+        // Spawn yt-dlp
+        const ytdlpProcess = spawn(ytDlpPath, ytdlpArgs, { 
+          stdio: ['pipe', 'pipe', 'pipe'],
+          shell: false
+        });
+        
+        // Spawn ffmpeg
+        this.ffmpegProcess = spawn('ffmpeg', ffmpegArgs, { 
+          stdio: ['pipe', 'pipe', 'pipe'],
+          shell: false
+        });
+        
+        // Pipe yt-dlp stdout to ffmpeg stdin
+        ytdlpProcess.stdout?.pipe(this.ffmpegProcess.stdin!);
+        
+        // Handle yt-dlp errors
+        ytdlpProcess.stderr?.on('data', (data: Buffer) => {
+          const msg = data.toString();
+          if (msg.includes('ERROR')) {
+            console.error('yt-dlp error:', msg);
+          }
+        });
+        
+        ytdlpProcess.on('error', (err) => {
+          console.error('yt-dlp process error:', err.message);
+        });
+        
+        ytdlpProcess.on('close', (code) => {
+          if (code !== 0) {
+            console.error(`yt-dlp exited with code ${code}`);
+          }
+        });
       }
     } else {
       console.log('Using direct FFmpeg mode');

@@ -32,12 +32,13 @@ npm install @jubbio/voice
 
 ## Quick Start
 
-```typescript
-import { Client, GatewayIntentBits } from '@jubbio/core';
+```javascript
+import { Client, GatewayIntentBits, EmbedBuilder, Colors } from '@jubbio/core';
 import { 
   joinVoiceChannel, 
   createAudioPlayer, 
   createAudioResourceFromUrl,
+  probeAudioInfo,
   AudioPlayerStatus 
 } from '@jubbio/voice';
 
@@ -59,28 +60,48 @@ client.on('interactionCreate', async (interaction) => {
       return interaction.reply('❌ Join a voice channel first!');
     }
     
-    // Join voice channel
-    const connection = joinVoiceChannel({
-      channelId: voiceChannel,
-      guildId: interaction.guildId,
-      adapterCreator: client.voice.adapters.get(interaction.guildId)
-    });
+    // Defer reply while fetching song info
+    await interaction.deferReply();
     
-    // Create player and play
-    const player = createAudioPlayer();
-    const resource = createAudioResourceFromUrl(url);
-    
-    connection.subscribe(player);
-    player.play(resource);
-    
-    // Handle playback end
-    player.on('stateChange', (oldState, newState) => {
-      if (newState.status === AudioPlayerStatus.Idle) {
-        console.log('Playback finished!');
+    try {
+      // Get song info
+      const info = await probeAudioInfo(url);
+      
+      // Join voice channel
+      const connection = joinVoiceChannel({
+        channelId: voiceChannel,
+        guildId: interaction.guildId,
+        adapterCreator: client.voice.adapters.get(interaction.guildId)
+      });
+      
+      // Create player and play
+      const player = createAudioPlayer();
+      const resource = createAudioResourceFromUrl(info.url);
+      
+      connection.subscribe(player);
+      player.play(resource);
+      
+      // Format duration
+      const minutes = Math.floor(info.duration / 60);
+      const seconds = info.duration % 60;
+      const durationStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      
+      // Create embed with song info
+      const embed = new EmbedBuilder()
+        .setTitle('🎵 Now Playing')
+        .setDescription(`**${info.title}**`)
+        .setColor(Colors.Blue)
+        .addFields({ name: 'Duration', value: durationStr, inline: true })
+        .setTimestamp();
+      
+      if (info.thumbnail) {
+        embed.setThumbnail(info.thumbnail);
       }
-    });
-    
-    await interaction.reply('🎵 Now playing!');
+      
+      await interaction.editReply({ embeds: [embed] });
+    } catch (error) {
+      await interaction.editReply(`❌ Error: ${error.message}`);
+    }
   }
 });
 

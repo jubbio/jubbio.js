@@ -2,6 +2,7 @@ import { APIInteraction, APIInteractionOption, APIEmbed } from '../types';
 import { InteractionType, InteractionResponseType, MessageFlags } from '../enums';
 import { User } from './User';
 import { GuildMember } from './GuildMember';
+import { EmbedBuilder } from '../builders/EmbedBuilder';
 import type { Client } from '../Client';
 
 /**
@@ -108,9 +109,12 @@ export class Interaction {
     }
     
     const content = typeof options === 'string' ? options : options.content;
-    const embeds = typeof options === 'string' ? undefined : options.embeds;
+    const rawEmbeds = typeof options === 'string' ? undefined : options.embeds;
     const components = typeof options === 'string' ? undefined : options.components;
     const ephemeral = typeof options === 'string' ? false : options.ephemeral;
+    
+    // Convert EmbedBuilder instances to plain objects
+    const embeds = rawEmbeds?.map(e => e instanceof EmbedBuilder ? e.toJSON() : e);
     
     await this.client.rest.createInteractionResponse(this.id, this.token, {
       type: InteractionResponseType.ChannelMessageWithSource,
@@ -146,9 +150,12 @@ export class Interaction {
    */
   async editReply(options: string | InteractionReplyOptions): Promise<void> {
     const content = typeof options === 'string' ? options : options.content;
-    const embeds = typeof options === 'string' ? undefined : options.embeds;
+    const rawEmbeds = typeof options === 'string' ? undefined : options.embeds;
     const components = typeof options === 'string' ? undefined : options.components;
     const files = typeof options === 'string' ? undefined : options.files;
+    
+    // Convert EmbedBuilder instances to plain objects
+    const embeds = rawEmbeds?.map(e => e instanceof EmbedBuilder ? e.toJSON() : e);
     
     await this.client.rest.editInteractionResponse(this.token, {
       content,
@@ -170,8 +177,11 @@ export class Interaction {
    */
   async followUp(options: string | InteractionReplyOptions): Promise<void> {
     const content = typeof options === 'string' ? options : options.content;
-    const embeds = typeof options === 'string' ? undefined : options.embeds;
+    const rawEmbeds = typeof options === 'string' ? undefined : options.embeds;
     const ephemeral = typeof options === 'string' ? false : options.ephemeral;
+    
+    // Convert EmbedBuilder instances to plain objects
+    const embeds = rawEmbeds?.map(e => e instanceof EmbedBuilder ? e.toJSON() : e);
     
     await this.client.rest.createFollowup(this.token, {
       content,
@@ -339,11 +349,14 @@ export class ButtonInteraction extends Interaction {
    * Update the message the button is attached to
    */
   async update(options: InteractionReplyOptions): Promise<void> {
+    // Convert EmbedBuilder instances to plain objects
+    const embeds = options.embeds?.map(e => e instanceof EmbedBuilder ? e.toJSON() : e);
+    
     await this.client.rest.createInteractionResponse(this.id, this.token, {
       type: InteractionResponseType.UpdateMessage,
       data: {
         content: options.content,
-        embeds: options.embeds,
+        embeds,
         components: options.components
       }
     });
@@ -378,11 +391,14 @@ export class SelectMenuInteraction extends Interaction {
    * Update the message the select menu is attached to
    */
   async update(options: InteractionReplyOptions): Promise<void> {
+    // Convert EmbedBuilder instances to plain objects
+    const embeds = options.embeds?.map(e => e instanceof EmbedBuilder ? e.toJSON() : e);
+    
     await this.client.rest.createInteractionResponse(this.id, this.token, {
       type: InteractionResponseType.UpdateMessage,
       data: {
         content: options.content,
-        embeds: options.embeds,
+        embeds,
         components: options.components
       }
     });
@@ -430,7 +446,7 @@ export class ModalFields {
 // Types
 export interface InteractionReplyOptions {
   content?: string;
-  embeds?: APIEmbed[];
+  embeds?: (APIEmbed | EmbedBuilder)[];
   components?: any[];
   ephemeral?: boolean;
   files?: Array<{ name: string; data: Buffer; contentType?: string }>;

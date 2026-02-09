@@ -2,6 +2,7 @@ import { APIInteraction, APIInteractionOption, APIEmbed } from '../types';
 import { InteractionType } from '../enums';
 import { User } from './User';
 import { GuildMember } from './GuildMember';
+import { EmbedBuilder } from '../builders/EmbedBuilder';
 import type { Client } from '../Client';
 /**
  * Base interaction class
@@ -200,7 +201,7 @@ export declare class ModalFields {
 }
 export interface InteractionReplyOptions {
     content?: string;
-    embeds?: APIEmbed[];
+    embeds?: (APIEmbed | EmbedBuilder)[];
     components?: any[];
     ephemeral?: boolean;
     files?: Array<{
