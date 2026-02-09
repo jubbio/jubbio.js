@@ -1,16 +1,27 @@
 {
   "name": "@jubbio/core",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "Core library for Jubbio bots",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build"
   },
-  "keywords": ["jubbio", "bot", "gateway", "api", "realtime", "chat"],
+  "keywords": [
+    "jubbio",
+    "bot",
+    "gateway",
+    "api",
+    "realtime",
+    "chat"
+  ],
   "author": "Jubbio Team",
   "license": "MIT",
   "repository": {

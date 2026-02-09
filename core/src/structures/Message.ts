@@ -61,8 +61,14 @@ export class Message {
     this.guildId = data.guild_id;
     this.author = new User(data.author);
     this.content = data.content;
-    this.createdTimestamp = new Date(data.timestamp).getTime();
-    this.editedTimestamp = data.edited_timestamp ? new Date(data.edited_timestamp).getTime() : undefined;
+    
+    // Handle different timestamp formats from backend
+    const timestamp = data.timestamp || (data as any).created_at;
+    this.createdTimestamp = timestamp ? new Date(timestamp).getTime() : Date.now();
+    
+    const editedTimestamp = data.edited_timestamp || (data as any).updated_at;
+    this.editedTimestamp = editedTimestamp ? new Date(editedTimestamp).getTime() : undefined;
+    
     this.attachments = data.attachments || [];
     this.embeds = data.embeds || [];
     this.mentions = (data as any).mentions || {};

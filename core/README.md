@@ -93,12 +93,27 @@ GatewayIntentBits.MessageContent      // Message content access
 |-------|-------------|
 | `ready` | Bot is connected and ready |
 | `messageCreate` | New message received |
+| `messageUpdate` | Message was edited |
+| `messageDelete` | Message was deleted |
+| `messageDeleteBulk` | Multiple messages deleted |
 | `interactionCreate` | Slash command or component interaction |
 | `guildCreate` | Bot joined a guild |
+| `guildUpdate` | Guild was updated |
 | `guildDelete` | Bot left a guild |
+| `guildMemberAdd` | Member joined a guild |
+| `guildMemberUpdate` | Member was updated |
+| `guildMemberRemove` | Member left a guild |
+| `channelCreate` | Channel was created |
+| `channelUpdate` | Channel was updated |
+| `channelDelete` | Channel was deleted |
+| `roleCreate` | Role was created |
+| `roleUpdate` | Role was updated |
+| `roleDelete` | Role was deleted |
 | `voiceStateUpdate` | Voice state changed |
+| `typingStart` | User started typing |
 | `error` | Error occurred |
 | `debug` | Debug information |
+| `raw` | Raw gateway event (unhandled events) |
 
 ## Builders
 
