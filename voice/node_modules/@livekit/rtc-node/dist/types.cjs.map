@@ -1,1 +1,0 @@
-{"version":3,"sources":["../src/types.ts"],"sourcesContent":["// SPDX-FileCopyrightText: 2024 LiveKit, Inc.\n//\n// SPDX-License-Identifier: Apache-2.0\nexport interface ChatMessage {\n  id: string;\n  timestamp: number;\n  message: string;\n  editTimestamp?: number;\n  generated?: boolean;\n}\n"],"mappings":";;;;;;;;;;;;;;AAAA;AAAA;","names":[]}
