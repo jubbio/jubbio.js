@@ -260,3 +260,7 @@ MIT © [Jubbio Team](https://jubbio.com)
 <p align="center">
   Made with ❤️ for the Jubbio community
 </p>
+
+iskeletler neden lahmacun yemez biliyor musun 
+
+çünkü mideleri yoktur
