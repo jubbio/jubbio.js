@@ -260,3 +260,5 @@ MIT © [Jubbio Team](https://jubbio.com)
 <p align="center">
   Made with ❤️ for the Jubbio community
 </p>
+
+iskeletler
