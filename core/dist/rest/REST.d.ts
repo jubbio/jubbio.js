@@ -62,7 +62,7 @@ export declare class REST {
      *
      * @example
      * const mention = rest.formatMention(user);
-     * // mention.text = "@ilkay"
+     * // mention.text = "<@1>"
      * // mention.data = { users: [{ id: 1, username: "ilkay" }] }
      */
     formatMention(user: {
@@ -73,12 +73,12 @@ export declare class REST {
         data: MentionsData;
     };
     /**
-     * Parse mentions (<@ID>) and convert to our format (@username)
-     * Also builds the mentions data structure
+     * Parse mentions (<@ID>) in content and build mentions data structure
+     * Content is kept as-is with <@ID> format (client renders them)
      *
      * @param content - Message content with mentions
      * @param existingMentions - Existing mentions data to merge with
-     * @returns Processed content and mentions data
+     * @returns Original content and mentions data
      */
     private processMentions;
     /**
@@ -96,18 +96,11 @@ export declare class REST {
     private request;
     /**
      * Create a message in a channel
-     * Automatically processes mentions (<@ID>) to our format (@username)
+     * Mentions use <@ID> format and are kept as-is (client renders them)
      *
      * @example
-     * // Mention style (auto-converted):
      * await rest.createMessage(guildId, channelId, {
-     *   content: 'Hello <@123>!',  // Becomes "Hello @username!"
-     * });
-     *
-     * // Our native format:
-     * await rest.createMessage(guildId, channelId, {
-     *   content: 'Hello @ilkay!',
-     *   mentions: { users: [{ id: 123, username: 'ilkay' }] }
+     *   content: 'Hello <@123>!',
      * });
      */
     createMessage(guildIdOrChannelId: string, channelIdOrData: string | {

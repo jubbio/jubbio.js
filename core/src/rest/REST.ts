@@ -88,13 +88,13 @@ export class REST {
    * 
    * @example
    * const mention = rest.formatMention(user);
-   * // mention.text = "@ilkay"
+   * // mention.text = "<@1>"
    * // mention.data = { users: [{ id: 1, username: "ilkay" }] }
    */
   formatMention(user: { id: string | number; username: string }): { text: string; data: MentionsData } {
     const userId = typeof user.id === 'string' ? parseInt(user.id, 10) : user.id;
     return {
-      text: `@${user.username}`,
+      text: `<@${userId}>`,
       data: {
         users: [{ id: userId, username: user.username }]
       }
@@ -102,12 +102,12 @@ export class REST {
   }
 
   /**
-   * Parse mentions (<@ID>) and convert to our format (@username)
-   * Also builds the mentions data structure
+   * Parse mentions (<@ID>) in content and build mentions data structure
+   * Content is kept as-is with <@ID> format (client renders them)
    * 
    * @param content - Message content with mentions
    * @param existingMentions - Existing mentions data to merge with
-   * @returns Processed content and mentions data
+   * @returns Original content and mentions data
    */
   private processMentions(content: string, existingMentions?: MentionsData): { content: string; mentions: MentionsData } {
     const mentions: MentionsData = {
@@ -119,50 +119,27 @@ export class REST {
     // Track already added user IDs to avoid duplicates
     const addedUserIds = new Set(mentions.users?.map(u => u.id) || []);
 
-    // Parse <@ID> format (user mentions)
+    // Parse <@ID> format (user mentions) — keep content as-is, only build mentions data
     const userMentionRegex = /<@!?(\d+)>/g;
-    let processedContent = content;
     let match;
 
     while ((match = userMentionRegex.exec(content)) !== null) {
       const userId = parseInt(match[1], 10);
-      const fullMatch = match[0];
 
-      // Try to get username from cache
-      const cachedUser = this.getCachedUser(userId);
-      
-      if (cachedUser) {
-        // Replace <@ID> with @username
-        processedContent = processedContent.replace(fullMatch, `@${cachedUser.username}`);
-        
-        // Add to mentions if not already added
-        if (!addedUserIds.has(userId)) {
-          mentions.users!.push({ id: userId, username: cachedUser.username });
-          addedUserIds.add(userId);
-        }
-      } else {
-        // User not in cache - keep as @User_ID format (backend will resolve)
-        processedContent = processedContent.replace(fullMatch, `@User_${userId}`);
-        
-        // Still add to mentions with placeholder username
-        if (!addedUserIds.has(userId)) {
-          mentions.users!.push({ id: userId, username: `User_${userId}` });
-          addedUserIds.add(userId);
-        }
+      if (!addedUserIds.has(userId)) {
+        // Try to get username from cache for mentions data
+        const cachedUser = this.getCachedUser(userId);
+        mentions.users!.push({ id: userId, username: cachedUser?.username || `User_${userId}` });
+        addedUserIds.add(userId);
       }
     }
 
-    // Parse <@&ID> format (role mentions)
+    // Parse <@&ID> format (role mentions) — keep content as-is
     const roleMentionRegex = /<@&(\d+)>/g;
     const addedRoleIds = new Set(mentions.roles?.map(r => r.id) || []);
 
     while ((match = roleMentionRegex.exec(content)) !== null) {
       const roleId = match[1];
-      const fullMatch = match[0];
-
-      // Replace with @role format (backend handles role resolution)
-      processedContent = processedContent.replace(fullMatch, `@role_${roleId}`);
-      
       if (!addedRoleIds.has(roleId)) {
         mentions.roles!.push({ id: roleId });
         addedRoleIds.add(roleId);
@@ -178,7 +155,7 @@ export class REST {
     if (mentions.users?.length === 0) delete mentions.users;
     if (mentions.roles?.length === 0) delete mentions.roles;
 
-    return { content: processedContent, mentions };
+    return { content, mentions };
   }
 
   /**
@@ -340,18 +317,11 @@ export class REST {
 
   /**
    * Create a message in a channel
-   * Automatically processes mentions (<@ID>) to our format (@username)
+   * Mentions use <@ID> format and are kept as-is (client renders them)
    * 
    * @example
-   * // Mention style (auto-converted):
    * await rest.createMessage(guildId, channelId, {
-   *   content: 'Hello <@123>!',  // Becomes "Hello @username!"
-   * });
-   * 
-   * // Our native format:
-   * await rest.createMessage(guildId, channelId, {
-   *   content: 'Hello @ilkay!',
-   *   mentions: { users: [{ id: 123, username: 'ilkay' }] }
+   *   content: 'Hello <@123>!',
    * });
    */
   async createMessage(guildIdOrChannelId: string, channelIdOrData: string | {
