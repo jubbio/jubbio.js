@@ -13,9 +13,6 @@ export enum ChannelType {
   GroupDM = 3,
   GuildCategory = 4,
   GuildAnnouncement = 5,
-  AnnouncementThread = 10,
-  PublicThread = 11,
-  PrivateThread = 12,
   GuildStageVoice = 13,
   GuildDirectory = 14,
   GuildForum = 15,
@@ -62,7 +59,6 @@ export class GuildChannelManager extends CachedManager<string, any> {
       get isText() { return [ChannelType.GuildText, ChannelType.GuildAnnouncement].includes(this.type); },
       get isVoice() { return [ChannelType.GuildVoice, ChannelType.GuildStageVoice].includes(this.type); },
       get isCategory() { return this.type === ChannelType.GuildCategory; },
-      get isThread() { return [ChannelType.PublicThread, ChannelType.PrivateThread, ChannelType.AnnouncementThread].includes(this.type); },
       
       toString() { return `<#${this.id}>`; },
       

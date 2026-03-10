@@ -82,9 +82,6 @@ export declare enum ChannelType {
     GroupDM = 3,
     GuildCategory = 4,
     GuildAnnouncement = 5,
-    AnnouncementThread = 10,
-    PublicThread = 11,
-    PrivateThread = 12,
     GuildStageVoice = 13,
     GuildDirectory = 14,
     GuildForum = 15
@@ -110,10 +107,8 @@ export declare enum MessageFlags {
     SuppressEmbeds = 4,
     SourceMessageDeleted = 8,
     Urgent = 16,
-    HasThread = 32,
     Ephemeral = 64,
     Loading = 128,
-    FailedToMentionSomeRolesInThread = 256,
     SuppressNotifications = 4096
 }
 /**

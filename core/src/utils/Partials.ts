@@ -12,7 +12,6 @@ export enum Partials {
   Message = 3,
   Reaction = 4,
   GuildScheduledEvent = 5,
-  ThreadMember = 6,
 }
 
 /**

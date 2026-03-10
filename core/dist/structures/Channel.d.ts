@@ -4,6 +4,7 @@ import type { Client } from '../Client';
 import { Message } from './Message';
 import { Collection } from './Collection';
 import { MessageCollector, MessageCollectorOptions } from '../utils/Collector';
+import { EmbedBuilder } from '../builders/EmbedBuilder';
 /**
  * Await messages options
  */
@@ -111,7 +112,8 @@ export declare class DMChannel extends BaseChannel {
  */
 export interface MessageCreateOptions {
     content?: string;
-    embeds?: APIEmbed[];
+    embeds?: (APIEmbed | EmbedBuilder)[];
+    components?: any[];
     files?: any[];
 }
 /**

@@ -210,10 +210,11 @@ export class CommandInteraction extends Interaction {
   /**
    * Show a modal
    */
-  async showModal(modal: ModalData): Promise<void> {
+  async showModal(modal: ModalData | { toJSON(): ModalData }): Promise<void> {
+    const modalData = 'toJSON' in modal && typeof modal.toJSON === 'function' ? modal.toJSON() : modal;
     await this.client.rest.createInteractionResponse(this.id, this.token, {
       type: InteractionResponseType.Modal,
-      data: modal
+      data: modalData
     });
   }
 }
@@ -362,6 +363,17 @@ export class ButtonInteraction extends Interaction {
     });
     this.replied = true;
   }
+
+  /**
+   * Show a modal in response to this button interaction
+   */
+  async showModal(modal: ModalData | { toJSON(): ModalData }): Promise<void> {
+    const modalData = 'toJSON' in modal && typeof modal.toJSON === 'function' ? modal.toJSON() : modal;
+    await this.client.rest.createInteractionResponse(this.id, this.token, {
+      type: InteractionResponseType.Modal,
+      data: modalData
+    });
+  }
 }
 
 /**
@@ -404,6 +416,17 @@ export class SelectMenuInteraction extends Interaction {
     });
     this.replied = true;
   }
+
+  /**
+   * Show a modal in response to this select menu interaction
+   */
+  async showModal(modal: ModalData | { toJSON(): ModalData }): Promise<void> {
+    const modalData = 'toJSON' in modal && typeof modal.toJSON === 'function' ? modal.toJSON() : modal;
+    await this.client.rest.createInteractionResponse(this.id, this.token, {
+      type: InteractionResponseType.Modal,
+      data: modalData
+    });
+  }
 }
 
 /**
@@ -419,7 +442,9 @@ export class ModalSubmitInteraction extends Interaction {
   constructor(client: Client, data: APIInteraction) {
     super(client, data);
     this.customId = data.data?.custom_id || '';
-    this.fields = new ModalFields(data.data?.values || []);
+    // Modal values come from components array (action rows containing text inputs)
+    const components = (data.data as any)?.components || [];
+    this.fields = new ModalFields(components);
   }
 }
 
@@ -427,19 +452,34 @@ export class ModalSubmitInteraction extends Interaction {
  * Modal fields helper
  */
 export class ModalFields {
-  private values: string[];
+  private fieldMap: Map<string, string>;
 
-  constructor(values: string[]) {
-    this.values = values;
+  constructor(components: any[]) {
+    this.fieldMap = new Map();
+    // Parse action rows → text inputs
+    for (const row of components) {
+      const innerComponents = row?.components || [];
+      for (const comp of innerComponents) {
+        if (comp.custom_id && comp.value !== undefined) {
+          this.fieldMap.set(comp.custom_id, comp.value);
+        }
+      }
+    }
   }
 
   /**
-   * Get a text input value
+   * Get a text input value by custom_id
    */
   getTextInputValue(customId: string): string | null {
-    // Modal values are typically parsed from components
-    // This is a simplified implementation
-    return null;
+    return this.fieldMap.get(customId) ?? null;
+  }
+
+  /**
+   * Get a field (alias for getTextInputValue)
+   */
+  getField(customId: string): { value: string } | null {
+    const value = this.fieldMap.get(customId);
+    return value !== undefined ? { value } : null;
   }
 }
 

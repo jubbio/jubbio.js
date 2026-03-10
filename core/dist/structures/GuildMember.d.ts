@@ -4,6 +4,7 @@ import { Guild } from './Guild';
 import type { Client } from '../Client';
 /**
  * Permission flags - permission bits
+ * Must match community-service/internal/guild/models/permissions.go (truth of source)
  */
 export declare const PermissionFlags: {
     readonly CreateInstantInvite: bigint;
@@ -14,7 +15,7 @@ export declare const PermissionFlags: {
     readonly ManageGuild: bigint;
     readonly AddReactions: bigint;
     readonly ViewAuditLog: bigint;
-    readonly PrioritySpeaker: bigint;
+    readonly ViewGuildInsights: bigint;
     readonly Stream: bigint;
     readonly ViewChannel: bigint;
     readonly SendMessages: bigint;
@@ -23,30 +24,33 @@ export declare const PermissionFlags: {
     readonly EmbedLinks: bigint;
     readonly AttachFiles: bigint;
     readonly ReadMessageHistory: bigint;
-    readonly MentionEveryone: bigint;
     readonly UseExternalEmojis: bigint;
-    readonly ViewGuildInsights: bigint;
+    readonly UseSlashCommands: bigint;
+    readonly MentionEveryone: bigint;
     readonly Connect: bigint;
     readonly Speak: bigint;
     readonly MuteMembers: bigint;
     readonly DeafenMembers: bigint;
     readonly MoveMembers: bigint;
     readonly UseVAD: bigint;
-    readonly ChangeNickname: bigint;
-    readonly ManageNicknames: bigint;
-    readonly ManageRoles: bigint;
-    readonly ManageWebhooks: bigint;
-    readonly ManageEmojisAndStickers: bigint;
-    readonly UseApplicationCommands: bigint;
+    readonly ChangeCodec: bigint;
+    readonly AudioQualityAdmin: bigint;
+    readonly VideoCall: bigint;
+    readonly ShareScreen: bigint;
+    readonly ShareCamera: bigint;
+    readonly ControlQuality: bigint;
     readonly RequestToSpeak: bigint;
     readonly ManageEvents: bigint;
-    readonly ManageThreads: bigint;
-    readonly CreatePublicThreads: bigint;
-    readonly CreatePrivateThreads: bigint;
-    readonly UseExternalStickers: bigint;
-    readonly SendMessagesInThreads: bigint;
-    readonly UseEmbeddedActivities: bigint;
+    readonly AddMembers: bigint;
+    readonly RemoveMembers: bigint;
+    readonly ChangeGroupIcon: bigint;
+    readonly ChangeDMSettings: bigint;
+    readonly ManageGroup: bigint;
+    readonly UseActivities: bigint;
     readonly ModerateMembers: bigint;
+    readonly ManageRoles: bigint;
+    readonly ManageEmojis: bigint;
+    readonly PrioritySpeaker: bigint;
 };
 /**
  * Permissions helper class

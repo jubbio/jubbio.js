@@ -169,6 +169,7 @@ export declare class REST {
     editMessage(guildId: string, channelId: string, messageId: string, data: {
         content?: string;
         embeds?: APIEmbed[];
+        components?: any[];
         mentions?: MentionsData;
     }): Promise<APIMessage>;
     /**
@@ -176,9 +177,21 @@ export declare class REST {
      */
     deleteMessage(guildId: string, channelId: string, messageId: string): Promise<void>;
     /**
+     * Validate and normalize emoji format for the API.
+     * Accepted formats: :name:, <:name:id>, <a:name:id>
+     * Unicode emoji characters (👍) are NOT supported.
+     */
+    private validateEmoji;
+    /**
      * Add a reaction to a message
+     * @param emoji - Emoji in :name:, <:name:id>, or <a:name:id> format. Unicode characters (👍) are not supported.
      */
     addReaction(guildId: string, channelId: string, messageId: string, emoji: string): Promise<void>;
+    /**
+     * Remove a reaction from a message
+     * @param emoji - Emoji in :name:, <:name:id>, or <a:name:id> format. Unicode characters (👍) are not supported.
+     */
+    removeReaction(guildId: string, channelId: string, messageId: string, emoji: string): Promise<void>;
     /**
      * Upload an attachment to a channel
      */
@@ -253,6 +266,34 @@ export declare class REST {
      * Delete a global command
      */
     deleteGlobalCommand(commandId: string): Promise<void>;
+    /**
+     * Delete a guild-specific command
+     */
+    deleteGuildCommand(guildId: string, commandId: string): Promise<void>;
+    /**
+     * List all global commands for this application
+     */
+    listGlobalCommands(): Promise<APIApplicationCommand[]>;
+    /**
+     * List all guild-specific commands for this application
+     */
+    listGuildCommands(guildId: string): Promise<APIApplicationCommand[]>;
+    /**
+     * Get a specific global command
+     */
+    getGlobalCommand(commandId: string): Promise<APIApplicationCommand>;
+    /**
+     * Get a specific guild command
+     */
+    getGuildCommand(guildId: string, commandId: string): Promise<APIApplicationCommand>;
+    /**
+     * Update a global command
+     */
+    updateGlobalCommand(commandId: string, data: Partial<APIApplicationCommand>): Promise<APIApplicationCommand>;
+    /**
+     * Update a guild-specific command
+     */
+    updateGuildCommand(guildId: string, commandId: string, data: Partial<APIApplicationCommand>): Promise<APIApplicationCommand>;
     private applicationId;
     /**
      * Set the application ID
@@ -287,6 +328,10 @@ export declare class REST {
      * Delete a channel
      */
     deleteChannel(guildId: string, channelId: string): Promise<void>;
+    /**
+     * Delete a category
+     */
+    deleteCategory(guildId: string, categoryId: string): Promise<void>;
     /**
      * Edit channel permission overwrites
      */
@@ -352,6 +397,20 @@ export declare class REST {
      */
     removeMemberRole(guildId: string, userId: string, roleId: string, reason?: string): Promise<void>;
     /**
+     * Bulk assign roles to members
+     */
+    bulkAssignRoles(guildId: string, assignments: {
+        user_id: string;
+        role_ids: string[];
+    }[]): Promise<any>;
+    /**
+     * Bulk remove roles from members
+     */
+    bulkRemoveRoles(guildId: string, removals: {
+        user_id: string;
+        role_ids: string[];
+    }[]): Promise<any>;
+    /**
      * Bulk delete messages
      */
     bulkDeleteMessages(guildId: string, channelId: string, messageIds: string[]): Promise<void>;
@@ -408,30 +467,6 @@ export declare class REST {
      */
     getGuildInvites(guildId: string): Promise<any[]>;
     /**
-     * Create a thread from a message
-     */
-    createThreadFromMessage(guildId: string, channelId: string, messageId: string, data: {
-        name: string;
-        auto_archive_duration?: number;
-    }): Promise<any>;
-    /**
-     * Create a thread without a message
-     */
-    createThread(guildId: string, channelId: string, data: {
-        name: string;
-        type?: number;
-        auto_archive_duration?: number;
-        invitable?: boolean;
-    }): Promise<any>;
-    /**
-     * Join a thread
-     */
-    joinThread(channelId: string): Promise<void>;
-    /**
-     * Leave a thread
-     */
-    leaveThread(channelId: string): Promise<void>;
-    /**
      * Pin a message
      */
     pinMessage(guildId: string, channelId: string, messageId: string): Promise<void>;
@@ -473,11 +508,26 @@ export declare class REST {
      */
     getChannelWebhooks(guildId: string, channelId: string): Promise<any[]>;
     /**
+     * Get guild webhooks
+     */
+    getGuildWebhooks(guildId: string): Promise<any[]>;
+    /**
      * Create a webhook
      */
     createWebhook(guildId: string, channelId: string, data: {
         name: string;
         avatar?: string;
     }): Promise<any>;
+    /**
+     * Update a webhook
+     */
+    updateWebhook(guildId: string, webhookId: string, data: {
+        name?: string;
+        avatar_url?: string;
+    }): Promise<any>;
+    /**
+     * Delete a webhook
+     */
+    deleteWebhook(guildId: string, webhookId: string): Promise<void>;
 }
 export {};

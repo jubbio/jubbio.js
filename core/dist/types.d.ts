@@ -53,7 +53,7 @@ export interface APIMessage {
     guild_id?: string;
     author: APIUser;
     user_id?: number;
-    content: string;
+    content: string | null;
     timestamp: string;
     edited_timestamp?: string;
     attachments?: APIAttachment[];

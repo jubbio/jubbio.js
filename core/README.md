@@ -177,6 +177,215 @@ import { joinVoiceChannel, createAudioPlayer } from '@jubbio/voice';
 // See @jubbio/voice documentation for full voice support
 ```
 
+## REST API
+
+Access the REST API via `client.rest`:
+
+### Messages
+
+```javascript
+// Send message
+await client.rest.createMessage(guildId, channelId, {
+  content: 'Hello!',
+  embeds: [embed]
+});
+
+// Edit message
+await client.rest.editMessage(guildId, channelId, messageId, {
+  content: 'Updated!'
+});
+
+// Delete message
+await client.rest.deleteMessage(guildId, channelId, messageId);
+
+// Bulk delete messages
+await client.rest.bulkDeleteMessages(guildId, channelId, messageIds);
+
+// Get messages
+const messages = await client.rest.getMessages(guildId, channelId, {
+  limit: 50,
+  before: messageId
+});
+
+// Add reaction
+await client.rest.addReaction(guildId, channelId, messageId, '👍');
+
+// Pin/Unpin message
+await client.rest.pinMessage(guildId, channelId, messageId);
+await client.rest.unpinMessage(guildId, channelId, messageId);
+await client.rest.getPinnedMessages(guildId, channelId);
+```
+
+### Members
+
+```javascript
+// Get member
+const member = await client.rest.getMember(guildId, userId);
+
+// Timeout member (duration in seconds, null to remove)
+await client.rest.timeoutMember(guildId, userId, 3600, 'Spam');
+
+// Kick member
+await client.rest.kickMember(guildId, userId, 'Rule violation');
+
+// Ban member
+await client.rest.banMember(guildId, userId, {
+  deleteMessageDays: 7,
+  reason: 'Severe violation'
+});
+
+// Unban member
+await client.rest.unbanMember(guildId, userId);
+
+// Edit member
+await client.rest.editMember(guildId, userId, {
+  nick: 'New Nickname',
+  roles: ['roleId1', 'roleId2']
+});
+
+// Add/Remove role
+await client.rest.addMemberRole(guildId, userId, roleId);
+await client.rest.removeMemberRole(guildId, userId, roleId);
+```
+
+### Roles
+
+```javascript
+// Get roles
+const roles = await client.rest.getRoles(guildId);
+
+// Create role
+const role = await client.rest.createRole(guildId, {
+  name: 'New Role',
+  color: 0xFF0000,
+  permissions: '8'
+});
+
+// Edit role
+await client.rest.editRole(guildId, roleId, {
+  name: 'Updated Role',
+  color: 0x00FF00
+});
+
+// Delete role
+await client.rest.deleteRole(guildId, roleId);
+```
+
+### Channels
+
+```javascript
+// Get guild channels
+const channels = await client.rest.getGuildChannels(guildId);
+
+// Create channel
+const channel = await client.rest.createChannel(guildId, {
+  name: 'new-channel',
+  type: 0, // 0 = text, 2 = voice
+  parent_id: categoryId
+});
+
+// Delete channel
+await client.rest.deleteChannel(guildId, channelId);
+
+// Edit channel permissions
+await client.rest.editChannelPermissions(channelId, roleOrUserId, {
+  allow: '1024',
+  deny: '2048',
+  type: 0 // 0 = role, 1 = member
+});
+```
+
+### Threads
+
+```javascript
+// Create thread from message
+await client.rest.createThreadFromMessage(guildId, channelId, messageId, {
+  name: 'Discussion',
+  auto_archive_duration: 1440
+});
+
+// Create thread
+await client.rest.createThread(guildId, channelId, {
+  name: 'New Thread',
+  type: 11 // 11 = public, 12 = private
+});
+
+// Join/Leave thread
+await client.rest.joinThread(threadId);
+await client.rest.leaveThread(threadId);
+```
+
+### Guild
+
+```javascript
+// Get guild info
+const guild = await client.rest.getGuild(guildId);
+
+// Get bans
+const bans = await client.rest.getBans(guildId);
+const ban = await client.rest.getBan(guildId, userId);
+
+// Get emojis
+const emojis = await client.rest.getEmojis(guildId);
+
+// Get invites
+const invites = await client.rest.getGuildInvites(guildId);
+```
+
+### Invites
+
+```javascript
+// Create invite
+const invite = await client.rest.createInvite(guildId, channelId, {
+  max_age: 86400,
+  max_uses: 10
+});
+
+// Get invite
+const inviteInfo = await client.rest.getInvite(inviteCode);
+
+// Delete invite
+await client.rest.deleteInvite(inviteCode);
+```
+
+### Users
+
+```javascript
+// Get user
+const user = await client.rest.getUser(userId);
+
+// Get current bot user
+const botUser = await client.rest.getCurrentUser();
+```
+
+### Slash Commands
+
+```javascript
+// Register global commands
+await client.rest.registerGlobalCommands([
+  { name: 'ping', description: 'Pong!' },
+  { name: 'help', description: 'Show help' }
+]);
+
+// Register guild commands (instant, for testing)
+await client.rest.registerGuildCommands(guildId, commands);
+
+// Delete global command
+await client.rest.deleteGlobalCommand(commandId);
+```
+
+### Webhooks
+
+```javascript
+// Get channel webhooks
+const webhooks = await client.rest.getChannelWebhooks(guildId, channelId);
+
+// Create webhook
+const webhook = await client.rest.createWebhook(guildId, channelId, {
+  name: 'My Webhook'
+});
+```
+
 ## License
 
 MIT © [Jubbio Team](https://jubbio.com)

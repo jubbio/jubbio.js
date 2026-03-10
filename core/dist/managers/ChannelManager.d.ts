@@ -11,9 +11,6 @@ export declare enum ChannelType {
     GroupDM = 3,
     GuildCategory = 4,
     GuildAnnouncement = 5,
-    AnnouncementThread = 10,
-    PublicThread = 11,
-    PrivateThread = 12,
     GuildStageVoice = 13,
     GuildDirectory = 14,
     GuildForum = 15

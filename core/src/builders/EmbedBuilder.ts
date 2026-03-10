@@ -164,26 +164,32 @@ export class EmbedBuilder {
   }
 
   /**
-   * Adds fields to this embed
+   * Adds fields to this embed (max 25 fields per embed)
    * @param fields The fields to add
    */
   addFields(...fields: APIEmbedField[]): this {
     if (!this.data.fields) this.data.fields = [];
+    if (this.data.fields.length + fields.length > 25) {
+      throw new RangeError(`Embed fields cannot exceed 25. Current: ${this.data.fields.length}, adding: ${fields.length}`);
+    }
     this.data.fields.push(...fields);
     return this;
   }
 
   /**
-   * Sets the fields of this embed
+   * Sets the fields of this embed (max 25 fields per embed)
    * @param fields The fields to set
    */
   setFields(...fields: APIEmbedField[]): this {
+    if (fields.length > 25) {
+      throw new RangeError(`Embed fields cannot exceed 25. Provided: ${fields.length}`);
+    }
     this.data.fields = fields;
     return this;
   }
 
   /**
-   * Removes, replaces, or inserts fields
+   * Removes, replaces, or inserts fields (max 25 fields per embed)
    * @param index The index to start at
    * @param deleteCount The number of fields to remove
    * @param fields The fields to insert
@@ -191,8 +197,12 @@ export class EmbedBuilder {
   spliceFields(index: number, deleteCount: number, ...fields: APIEmbedField[]): this {
     if (!this.data.fields) this.data.fields = [];
     this.data.fields.splice(index, deleteCount, ...fields);
+    if (this.data.fields.length > 25) {
+      throw new RangeError(`Embed fields cannot exceed 25. Result would have: ${this.data.fields.length}`);
+    }
     return this;
   }
+
 
   /**
    * Returns the JSON representation of this embed

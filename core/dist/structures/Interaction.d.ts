@@ -86,7 +86,9 @@ export declare class CommandInteraction extends Interaction {
     /**
      * Show a modal
      */
-    showModal(modal: ModalData): Promise<void>;
+    showModal(modal: ModalData | {
+        toJSON(): ModalData;
+    }): Promise<void>;
 }
 /**
  * Command interaction options helper
@@ -159,6 +161,12 @@ export declare class ButtonInteraction extends Interaction {
      * Update the message the button is attached to
      */
     update(options: InteractionReplyOptions): Promise<void>;
+    /**
+     * Show a modal in response to this button interaction
+     */
+    showModal(modal: ModalData | {
+        toJSON(): ModalData;
+    }): Promise<void>;
 }
 /**
  * Select menu interaction
@@ -177,6 +185,12 @@ export declare class SelectMenuInteraction extends Interaction {
      * Update the message the select menu is attached to
      */
     update(options: InteractionReplyOptions): Promise<void>;
+    /**
+     * Show a modal in response to this select menu interaction
+     */
+    showModal(modal: ModalData | {
+        toJSON(): ModalData;
+    }): Promise<void>;
 }
 /**
  * Modal submit interaction
@@ -192,12 +206,18 @@ export declare class ModalSubmitInteraction extends Interaction {
  * Modal fields helper
  */
 export declare class ModalFields {
-    private values;
-    constructor(values: string[]);
+    private fieldMap;
+    constructor(components: any[]);
     /**
-     * Get a text input value
+     * Get a text input value by custom_id
      */
     getTextInputValue(customId: string): string | null;
+    /**
+     * Get a field (alias for getTextInputValue)
+     */
+    getField(customId: string): {
+        value: string;
+    } | null;
 }
 export interface InteractionReplyOptions {
     content?: string;

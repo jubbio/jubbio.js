@@ -35,10 +35,6 @@ export interface SweeperDefinitions {
     stageInstances?: SweeperOptions;
     /** Sweep stickers */
     stickers?: SweeperOptions;
-    /** Sweep thread members */
-    threadMembers?: SweeperOptions;
-    /** Sweep threads */
-    threads?: SweeperOptions;
     /** Sweep users */
     users?: SweeperOptions;
     /** Sweep voice states */
@@ -59,10 +55,6 @@ export declare const Sweepers: {
         getComparisonTimestamp?: (value: T) => number;
         excludeFromSweep?: (value: T) => boolean;
     }): () => (value: T) => boolean;
-    /**
-     * Filter that sweeps archived threads
-     */
-    archivedThreadSweepFilter(lifetime?: number): () => (thread: any) => boolean;
     /**
      * Filter that sweeps expired invites
      */

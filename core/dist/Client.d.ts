@@ -54,11 +54,21 @@ export declare class Client extends EventEmitter {
     /** Voice state update handlers (for voice adapters) */
     private voiceStateHandlers;
     private voiceServerHandlers;
+    /** Whether the client is currently in the login flow */
+    private _loginState;
+    /** Reconnect attempt counter */
+    private _reconnectAttempts;
+    /** Maximum reconnect attempts before giving up */
+    private readonly _maxReconnectAttempts;
     constructor(options: ClientOptions);
     /**
      * Calculate intents value
      */
     private getIntentsValue;
+    /**
+     * Gateway close code descriptions
+     */
+    private static readonly CLOSE_CODES;
     /**
      * Login to the gateway
      */

@@ -1,0 +1,14 @@
+{
+  "name": "jubbio-bots",
+  "version": "1.0.0",
+  "description": "Jubbio test bots",
+  "private": true,
+  "scripts": {
+    "mod-bot": "node test-mod-bot.js",
+    "music-bot": "node test-music-bot.js",
+    "support-bot": "node test-support-bot.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

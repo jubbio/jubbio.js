@@ -58,7 +58,7 @@ export interface APIMessage {
   guild_id?: string;
   author: APIUser;
   user_id?: number; // Backend sends user_id separately from author
-  content: string;
+  content: string | null;
   timestamp: string;
   edited_timestamp?: string;
   attachments?: APIAttachment[];

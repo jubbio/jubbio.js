@@ -4,6 +4,13 @@ import type { Client } from '../Client';
 import { Message } from './Message';
 import { Collection } from './Collection';
 import { MessageCollector, MessageCollectorOptions } from '../utils/Collector';
+import { EmbedBuilder, APIEmbed as BuilderAPIEmbed } from '../builders/EmbedBuilder';
+
+/** Resolve EmbedBuilder instances to plain API objects */
+function resolveEmbeds(embeds?: (BuilderAPIEmbed | EmbedBuilder)[]): BuilderAPIEmbed[] | undefined {
+  if (!embeds) return undefined;
+  return embeds.map(e => e instanceof EmbedBuilder ? e.toJSON() : e);
+}
 
 /**
  * Await messages options
@@ -95,11 +102,13 @@ export class TextChannel extends BaseChannel {
    */
   async send(options: string | MessageCreateOptions): Promise<Message> {
     const content = typeof options === 'string' ? options : options.content;
-    const embeds = typeof options === 'string' ? undefined : options.embeds;
+    const embeds = typeof options === 'string' ? undefined : resolveEmbeds(options.embeds);
+    const components = typeof options === 'string' ? undefined : options.components;
     
     const data = await this.client.rest.createMessage(this.guildId || '', this.id, {
       content,
-      embeds
+      embeds,
+      components,
     });
     
     return new Message(this.client, data);
@@ -230,7 +239,7 @@ export class DMChannel extends BaseChannel {
    */
   async send(options: string | MessageCreateOptions): Promise<Message> {
     const content = typeof options === 'string' ? options : options.content;
-    const embeds = typeof options === 'string' ? undefined : options.embeds;
+    const embeds = typeof options === 'string' ? undefined : resolveEmbeds(options.embeds);
     
     const data = await this.client.rest.createDMMessage(this.id, {
       content,
@@ -246,7 +255,8 @@ export class DMChannel extends BaseChannel {
  */
 export interface MessageCreateOptions {
   content?: string;
-  embeds?: APIEmbed[];
+  embeds?: (APIEmbed | EmbedBuilder)[];
+  components?: any[];
   files?: any[];
 }
 

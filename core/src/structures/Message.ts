@@ -4,6 +4,13 @@ import type { Client } from '../Client';
 import type { MessageCreateOptions } from './Channel';
 import { Collection } from './Collection';
 import { InteractionCollector, InteractionCollectorOptions } from '../utils/Collector';
+import { EmbedBuilder } from '../builders/EmbedBuilder';
+
+/** Resolve EmbedBuilder instances to plain API objects */
+function resolveEmbeds(embeds?: (APIEmbed | EmbedBuilder)[]): APIEmbed[] | undefined {
+  if (!embeds) return undefined;
+  return embeds.map(e => e instanceof EmbedBuilder ? e.toJSON() : e);
+}
 
 /**
  * Mention data from backend
@@ -60,7 +67,7 @@ export class Message {
     this.channelId = data.channel_id;
     this.guildId = data.guild_id;
     this.author = new User(data.author);
-    this.content = data.content;
+    this.content = data.content ?? '';
     
     // Handle different timestamp formats from backend
     const timestamp = data.timestamp || (data as any).created_at;
@@ -94,11 +101,13 @@ export class Message {
    */
   async reply(options: string | MessageCreateOptions): Promise<Message> {
     const content = typeof options === 'string' ? options : options.content;
-    const embeds = typeof options === 'string' ? undefined : options.embeds;
+    const embeds = typeof options === 'string' ? undefined : resolveEmbeds(options.embeds);
+    const components = typeof options === 'string' ? undefined : options.components;
     
     const data = await this.client.rest.createMessage(this.guildId || '', this.channelId, {
       content,
       embeds,
+      components,
       message_reference: { message_id: this.id }
     });
     
@@ -110,11 +119,13 @@ export class Message {
    */
   async edit(options: string | MessageCreateOptions): Promise<Message> {
     const content = typeof options === 'string' ? options : options.content;
-    const embeds = typeof options === 'string' ? undefined : options.embeds;
+    const embeds = typeof options === 'string' ? undefined : resolveEmbeds(options.embeds);
+    const components = typeof options === 'string' ? undefined : options.components;
     
     const data = await this.client.rest.editMessage(this.guildId || '', this.channelId, this.id, {
       content,
-      embeds
+      embeds,
+      components,
     });
     
     return new Message(this.client, data);

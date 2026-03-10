@@ -38,10 +38,6 @@ export interface SweeperDefinitions {
   stageInstances?: SweeperOptions;
   /** Sweep stickers */
   stickers?: SweeperOptions;
-  /** Sweep thread members */
-  threadMembers?: SweeperOptions;
-  /** Sweep threads */
-  threads?: SweeperOptions;
   /** Sweep users */
   users?: SweeperOptions;
   /** Sweep voice states */
@@ -73,22 +69,6 @@ export const Sweepers = {
         if (exclude(value)) return false;
         const timestamp = getTimestamp(value);
         return timestamp < cutoff;
-      };
-    };
-  },
-
-  /**
-   * Filter that sweeps archived threads
-   */
-  archivedThreadSweepFilter(lifetime = 14400) {
-    return () => {
-      const now = Date.now();
-      const cutoff = now - (lifetime * 1000);
-      
-      return (thread: any) => {
-        if (!thread.archived) return false;
-        const archivedAt = thread.archivedAt?.getTime() ?? thread.archiveTimestamp ?? 0;
-        return archivedAt < cutoff;
       };
     };
   },
@@ -234,8 +214,6 @@ export class SweeperManager {
           }
         });
         return null;
-      case 'threads':
-        return this.client.channels?.cache.filter((c: any) => c.isThread?.()) ?? null;
       case 'presences':
         // Sweep across all guilds
         this.client.guilds?.cache.forEach((guild: any) => {
@@ -316,10 +294,6 @@ export const DefaultSweeperOptions: SweeperDefinitions = {
   messages: {
     interval: 3600, // 1 hour
     filter: Sweepers.filterByLifetime({ lifetime: 1800 }), // 30 minutes
-  },
-  threads: {
-    interval: 3600,
-    filter: Sweepers.archivedThreadSweepFilter(14400), // 4 hours
   },
   invites: {
     interval: 3600,

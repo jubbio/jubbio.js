@@ -258,6 +258,16 @@ export class AudioPlayer extends EventEmitter {
           shell: true
         });
         
+        // Track data flow
+        let ytdlpDataReceived = 0;
+        
+        ytdlpProcess.stdout?.on('data', (chunk: Buffer) => {
+          ytdlpDataReceived += chunk.length;
+          if (ytdlpDataReceived < 10000 || ytdlpDataReceived % 100000 < 10000) {
+            console.log(`[yt-dlp] stdout data: ${chunk.length} bytes (total: ${ytdlpDataReceived})`);
+          }
+        });
+        
         // Pipe yt-dlp stdout to ffmpeg stdin
         ytdlpProcess.stdout?.pipe(this.ffmpegProcess.stdin!);
         
@@ -274,9 +284,7 @@ export class AudioPlayer extends EventEmitter {
         });
         
         ytdlpProcess.on('close', (code) => {
-          if (code !== 0) {
-            console.error(`yt-dlp exited with code ${code}`);
-          }
+          console.log(`[yt-dlp] closed with code ${code}, total data: ${ytdlpDataReceived} bytes`);
         });
       } else {
         // Unix: use args array (no shell needed)

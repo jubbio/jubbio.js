@@ -193,6 +193,14 @@ export class REST {
     message_reference?: { message_id: string };
   }): any {
     const result: any = { ...data };
+
+    // Resolve components (ActionRowBuilder / ButtonBuilder instances)
+    if (data.components && data.components.length > 0) {
+      result.components = data.components.map((c: any) =>
+        typeof c.toJSON === 'function' ? c.toJSON() : c
+      );
+    }
+
     let allMentions: MentionsData = { ...data.mentions };
 
     // Process mentions in content if present
@@ -205,32 +213,64 @@ export class REST {
     // Process mentions in embeds (description, title, footer, fields)
     if (data.embeds && data.embeds.length > 0) {
       result.embeds = data.embeds.map(embed => {
-        const processedEmbed: any = { ...embed };
+        // Support EmbedBuilder instances - extract raw data via toJSON()
+        const rawEmbed = typeof (embed as any).toJSON === 'function' ? (embed as any).toJSON() : embed;
+        const processedEmbed: any = { ...rawEmbed };
+
+        // Normalize thumbnail: string → { url: string }
+        if (typeof processedEmbed.thumbnail === 'string') {
+          processedEmbed.thumbnail = { url: processedEmbed.thumbnail };
+        }
+
+        // Normalize image: string → { url: string }
+        if (typeof processedEmbed.image === 'string') {
+          processedEmbed.image = { url: processedEmbed.image };
+        }
+
+        // Normalize color: hex string → number
+        if (typeof processedEmbed.color === 'string') {
+          processedEmbed.color = parseInt(processedEmbed.color.replace('#', ''), 16);
+        }
+
+        // Normalize timestamp: Date → ISO string
+        if (processedEmbed.timestamp instanceof Date) {
+          processedEmbed.timestamp = processedEmbed.timestamp.toISOString();
+        } else if (typeof processedEmbed.timestamp === 'number') {
+          processedEmbed.timestamp = new Date(processedEmbed.timestamp).toISOString();
+        }
+
+        // Normalize footer.iconURL → footer.icon_url
+        if (processedEmbed.footer) {
+          if (processedEmbed.footer.iconURL && !processedEmbed.footer.icon_url) {
+            processedEmbed.footer = { ...processedEmbed.footer, icon_url: processedEmbed.footer.iconURL };
+            delete processedEmbed.footer.iconURL;
+          }
+        }
         
         // Process description
-        if (embed.description) {
-          const { content, mentions } = this.processMentions(embed.description, allMentions);
+        if (rawEmbed.description) {
+          const { content, mentions } = this.processMentions(rawEmbed.description, allMentions);
           processedEmbed.description = content;
           allMentions = mentions;
         }
         
         // Process title
-        if (embed.title) {
-          const { content, mentions } = this.processMentions(embed.title, allMentions);
+        if (rawEmbed.title) {
+          const { content, mentions } = this.processMentions(rawEmbed.title, allMentions);
           processedEmbed.title = content;
           allMentions = mentions;
         }
         
         // Process footer text
-        if (embed.footer?.text) {
-          const { content, mentions } = this.processMentions(embed.footer.text, allMentions);
-          processedEmbed.footer = { ...embed.footer, text: content };
+        if (rawEmbed.footer?.text) {
+          const { content, mentions } = this.processMentions(rawEmbed.footer.text, allMentions);
+          processedEmbed.footer = { ...rawEmbed.footer, text: content };
           allMentions = mentions;
         }
         
         // Process fields
-        if (embed.fields && embed.fields.length > 0) {
-          processedEmbed.fields = embed.fields.map((field: any) => {
+        if (rawEmbed.fields && rawEmbed.fields.length > 0) {
+          processedEmbed.fields = rawEmbed.fields.map((field: any) => {
             const processedField: any = { ...field };
             if (field.value) {
               const { content, mentions } = this.processMentions(field.value, allMentions);
@@ -400,6 +440,7 @@ export class REST {
   async editMessage(guildId: string, channelId: string, messageId: string, data: {
     content?: string;
     embeds?: APIEmbed[];
+    components?: any[];
     mentions?: MentionsData;
   }): Promise<APIMessage> {
     const path = `/bot/guilds/${guildId}/channels/${channelId}/messages/${messageId}`;
@@ -416,12 +457,41 @@ export class REST {
   }
 
   /**
+   * Validate and normalize emoji format for the API.
+   * Accepted formats: :name:, <:name:id>, <a:name:id>
+   * Unicode emoji characters (👍) are NOT supported.
+   */
+  private validateEmoji(emoji: string): string {
+    const trimmed = emoji.trim();
+    // Custom emoji: <:name:id> or <a:name:id>
+    if (/^<a?:\w+:\d+>$/.test(trimmed)) return trimmed;
+    // Unicode emoji by name: :name:
+    if (/^:\w+:$/.test(trimmed)) return trimmed;
+    throw new Error(
+      `Geçersiz emoji formatı: "${emoji}". Kabul edilen formatlar: :emoji_name:, <:name:id>, <a:name:id>`
+    );
+  }
+
+  /**
    * Add a reaction to a message
+   * @param emoji - Emoji in :name:, <:name:id>, or <a:name:id> format. Unicode characters (👍) are not supported.
    */
   async addReaction(guildId: string, channelId: string, messageId: string, emoji: string): Promise<void> {
-    const path = `/bot/guilds/${guildId}/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}/@me`;
+    const validated = this.validateEmoji(emoji);
+    const path = `/bot/guilds/${guildId}/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(validated)}/@me`;
     await this.request<void>('PUT', path);
   }
+
+  /**
+   * Remove a reaction from a message
+   * @param emoji - Emoji in :name:, <:name:id>, or <a:name:id> format. Unicode characters (👍) are not supported.
+   */
+  async removeReaction(guildId: string, channelId: string, messageId: string, emoji: string): Promise<void> {
+    const validated = this.validateEmoji(emoji);
+    const path = `/bot/guilds/${guildId}/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(validated)}/@me`;
+    await this.request<void>('DELETE', path);
+  }
+
 
   /**
    * Upload an attachment to a channel
@@ -589,7 +659,7 @@ export class REST {
     if (processedData.components) payload.components = processedData.components;
     if (processedData.mentions) payload.mentions = processedData.mentions;
     
-    await this.request<void>('PATCH', `/webhooks/${appId}/${token}/messages/@original`, payload);
+    await this.request<void>('PATCH', `/interactions/webhooks/${appId}/${token}/messages/@original`, payload);
   }
 
   /**
@@ -597,7 +667,7 @@ export class REST {
    */
   async deleteInteractionResponse(token: string): Promise<void> {
     const appId = this.getApplicationId();
-    await this.request<void>('DELETE', `/webhooks/${appId}/${token}/messages/@original`);
+    await this.request<void>('DELETE', `/interactions/webhooks/${appId}/${token}/messages/@original`);
   }
 
   /**
@@ -612,7 +682,7 @@ export class REST {
   }): Promise<void> {
     const appId = this.getApplicationId();
     const processedData = this.prepareMessageData(data);
-    await this.request<void>('POST', `/webhooks/${appId}/${token}`, processedData);
+    await this.request<void>('POST', `/interactions/webhooks/${appId}/${token}`, processedData);
   }
 
   // ==================== Commands ====================
@@ -645,6 +715,62 @@ export class REST {
   async deleteGlobalCommand(commandId: string): Promise<void> {
     const appId = this.getApplicationId();
     await this.request<void>('DELETE', `/applications/${appId}/commands/${commandId}`);
+  }
+
+  /**
+   * Delete a guild-specific command
+   */
+  async deleteGuildCommand(guildId: string, commandId: string): Promise<void> {
+    const appId = this.getApplicationId();
+    await this.request<void>('DELETE', `/applications/${appId}/guilds/${guildId}/commands/${commandId}`);
+  }
+
+  /**
+   * List all global commands for this application
+   */
+  async listGlobalCommands(): Promise<APIApplicationCommand[]> {
+    const appId = this.getApplicationId();
+    return this.request<APIApplicationCommand[]>('GET', `/applications/${appId}/commands`);
+  }
+
+  /**
+   * List all guild-specific commands for this application
+   */
+  async listGuildCommands(guildId: string): Promise<APIApplicationCommand[]> {
+    const appId = this.getApplicationId();
+    return this.request<APIApplicationCommand[]>('GET', `/applications/${appId}/guilds/${guildId}/commands`);
+  }
+
+  /**
+   * Get a specific global command
+   */
+  async getGlobalCommand(commandId: string): Promise<APIApplicationCommand> {
+    const appId = this.getApplicationId();
+    return this.request<APIApplicationCommand>('GET', `/applications/${appId}/commands/${commandId}`);
+  }
+
+  /**
+   * Get a specific guild command
+   */
+  async getGuildCommand(guildId: string, commandId: string): Promise<APIApplicationCommand> {
+    const appId = this.getApplicationId();
+    return this.request<APIApplicationCommand>('GET', `/applications/${appId}/guilds/${guildId}/commands/${commandId}`);
+  }
+
+  /**
+   * Update a global command
+   */
+  async updateGlobalCommand(commandId: string, data: Partial<APIApplicationCommand>): Promise<APIApplicationCommand> {
+    const appId = this.getApplicationId();
+    return this.request<APIApplicationCommand>('PATCH', `/applications/${appId}/commands/${commandId}`, data);
+  }
+
+  /**
+   * Update a guild-specific command
+   */
+  async updateGuildCommand(guildId: string, commandId: string, data: Partial<APIApplicationCommand>): Promise<APIApplicationCommand> {
+    const appId = this.getApplicationId();
+    return this.request<APIApplicationCommand>('PATCH', `/applications/${appId}/guilds/${guildId}/commands/${commandId}`, data);
   }
 
   // ==================== Helpers ====================
@@ -714,6 +840,13 @@ export class REST {
    */
   async deleteChannel(guildId: string, channelId: string): Promise<void> {
     await this.request('DELETE', `/bot/guilds/${guildId}/channels/${channelId}`);
+  }
+
+  /**
+   * Delete a category
+   */
+  async deleteCategory(guildId: string, categoryId: string): Promise<void> {
+    await this.request('DELETE', `/bot/guilds/${guildId}/categories/${categoryId}`);
   }
 
   /**
@@ -843,6 +976,20 @@ export class REST {
   }
 
   /**
+   * Bulk assign roles to members
+   */
+  async bulkAssignRoles(guildId: string, assignments: { user_id: string; role_ids: string[] }[]): Promise<any> {
+    return this.request('PUT', `/bot/guilds/${guildId}/members/roles/assign`, { assignments });
+  }
+
+  /**
+   * Bulk remove roles from members
+   */
+  async bulkRemoveRoles(guildId: string, removals: { user_id: string; role_ids: string[] }[]): Promise<any> {
+    return this.request('DELETE', `/bot/guilds/${guildId}/members/roles/remove`, { removals });
+  }
+
+  /**
    * Bulk delete messages
    */
   async bulkDeleteMessages(guildId: string, channelId: string, messageIds: string[]): Promise<void> {
@@ -935,44 +1082,6 @@ export class REST {
     return this.request('GET', `/bot/guilds/${guildId}/invites`);
   }
 
-  // ==================== Threads ====================
-
-  /**
-   * Create a thread from a message
-   */
-  async createThreadFromMessage(guildId: string, channelId: string, messageId: string, data: {
-    name: string;
-    auto_archive_duration?: number;
-  }): Promise<any> {
-    return this.request('POST', `/bot/guilds/${guildId}/channels/${channelId}/messages/${messageId}/threads`, data);
-  }
-
-  /**
-   * Create a thread without a message
-   */
-  async createThread(guildId: string, channelId: string, data: {
-    name: string;
-    type?: number;
-    auto_archive_duration?: number;
-    invitable?: boolean;
-  }): Promise<any> {
-    return this.request('POST', `/bot/guilds/${guildId}/channels/${channelId}/threads`, data);
-  }
-
-  /**
-   * Join a thread
-   */
-  async joinThread(channelId: string): Promise<void> {
-    await this.request('PUT', `/bot/channels/${channelId}/thread-members/@me`);
-  }
-
-  /**
-   * Leave a thread
-   */
-  async leaveThread(channelId: string): Promise<void> {
-    await this.request('DELETE', `/bot/channels/${channelId}/thread-members/@me`);
-  }
-
   // ==================== Pins ====================
 
   /**
@@ -1050,6 +1159,13 @@ export class REST {
   }
 
   /**
+   * Get guild webhooks
+   */
+  async getGuildWebhooks(guildId: string): Promise<any[]> {
+    return this.request('GET', `/bot/guilds/${guildId}/webhooks`);
+  }
+
+  /**
    * Create a webhook
    */
   async createWebhook(guildId: string, channelId: string, data: {
@@ -1057,5 +1173,22 @@ export class REST {
     avatar?: string;
   }): Promise<any> {
     return this.request('POST', `/bot/guilds/${guildId}/channels/${channelId}/webhooks`, data);
+  }
+
+  /**
+   * Update a webhook
+   */
+  async updateWebhook(guildId: string, webhookId: string, data: {
+    name?: string;
+    avatar_url?: string;
+  }): Promise<any> {
+    return this.request('PATCH', `/bot/guilds/${guildId}/webhooks/${webhookId}`, data);
+  }
+
+  /**
+   * Delete a webhook
+   */
+  async deleteWebhook(guildId: string, webhookId: string): Promise<void> {
+    return this.request('DELETE', `/bot/guilds/${guildId}/webhooks/${webhookId}`);
   }
 }

@@ -10,8 +10,7 @@ export declare enum Partials {
     GuildMember = 2,
     Message = 3,
     Reaction = 4,
-    GuildScheduledEvent = 5,
-    ThreadMember = 6
+    GuildScheduledEvent = 5
 }
 /**
  * Check if a structure is partial (missing data)

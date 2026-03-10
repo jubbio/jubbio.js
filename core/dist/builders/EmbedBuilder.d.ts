@@ -96,17 +96,17 @@ export declare class EmbedBuilder {
         url?: string;
     } | null): this;
     /**
-     * Adds fields to this embed
+     * Adds fields to this embed (max 25 fields per embed)
      * @param fields The fields to add
      */
     addFields(...fields: APIEmbedField[]): this;
     /**
-     * Sets the fields of this embed
+     * Sets the fields of this embed (max 25 fields per embed)
      * @param fields The fields to set
      */
     setFields(...fields: APIEmbedField[]): this;
     /**
-     * Removes, replaces, or inserts fields
+     * Removes, replaces, or inserts fields (max 25 fields per embed)
      * @param index The index to start at
      * @param deleteCount The number of fields to remove
      * @param fields The fields to insert
