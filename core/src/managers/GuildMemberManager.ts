@@ -4,6 +4,7 @@
 
 import { CachedManager } from './BaseManager';
 import { Collection } from '../utils/Collection';
+import { Permissions } from '../structures/GuildMember';
 
 /**
  * Manages guild members
@@ -43,7 +44,7 @@ export class GuildMemberManager extends CachedManager<string, any> {
       deaf: data.deaf ?? false,
       mute: data.mute ?? false,
       pending: data.pending ?? false,
-      permissions: data.permissions,
+      permissions: new Permissions(data.permissions || '0', this.guild.ownerId === id),
       communicationDisabledUntil: data.communication_disabled_until 
         ? new Date(data.communication_disabled_until) 
         : null,
