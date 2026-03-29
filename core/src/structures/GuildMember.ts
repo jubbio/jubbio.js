@@ -82,23 +82,100 @@ export class Permissions {
   /**
    * Check if has a permission
    */
-  has(permission: string | bigint): boolean {
+  has(permission: string | bigint, checkAdmin = true): boolean {
     // Owner has all permissions
     if (this.isOwner) return true;
     
     // Administrator has all permissions
-    if ((this.bitfield & PermissionFlags.Administrator) === PermissionFlags.Administrator) {
+    if (checkAdmin && (this.bitfield & PermissionFlags.Administrator) === PermissionFlags.Administrator) {
       return true;
     }
     
-    let bit: bigint;
-    if (typeof permission === 'string') {
-      bit = PermissionFlags[permission as keyof typeof PermissionFlags] || 0n;
-    } else {
-      bit = permission;
+    const bit = Permissions.resolve(permission);
+    return (this.bitfield & bit) === bit;
+  }
+
+  /**
+   * Check if has any of the given permissions
+   */
+  any(permissions: (string | bigint)[], checkAdmin = true): boolean {
+    // Owner has all permissions
+    if (this.isOwner) return true;
+    
+    // Administrator has all permissions
+    if (checkAdmin && (this.bitfield & PermissionFlags.Administrator) === PermissionFlags.Administrator) {
+      return true;
     }
     
-    return (this.bitfield & bit) === bit;
+    for (const permission of permissions) {
+      const bit = Permissions.resolve(permission);
+      if ((this.bitfield & bit) === bit) return true;
+    }
+    
+    return false;
+  }
+
+  /**
+   * Return array of permission names that are missing
+   */
+  missing(permissions: (string | bigint)[], checkAdmin = true): string[] {
+    const missing: string[] = [];
+    for (const permission of permissions) {
+      if (!this.has(permission, checkAdmin)) {
+        if (typeof permission === 'string') {
+          missing.push(permission);
+        } else {
+          // Reverse lookup name from bigint
+          const name = Object.entries(PermissionFlags).find(([, v]) => v === permission)?.[0];
+          missing.push(name || permission.toString());
+        }
+      }
+    }
+    return missing;
+  }
+
+  /**
+   * Add permissions to this bitfield. Chainable.
+   */
+  add(...permissions: (string | bigint)[]): this {
+    for (const permission of permissions) {
+      this.bitfield |= Permissions.resolve(permission);
+    }
+    return this;
+  }
+
+  /**
+   * Remove permissions from this bitfield. Chainable.
+   */
+  remove(...permissions: (string | bigint)[]): this {
+    for (const permission of permissions) {
+      this.bitfield &= ~Permissions.resolve(permission);
+    }
+    return this;
+  }
+
+  /**
+   * Check equality with another Permissions or bigint
+   */
+  equals(other: Permissions | bigint | string | number): boolean {
+    if (other instanceof Permissions) {
+      return this.bitfield === other.bitfield;
+    }
+    return this.bitfield === BigInt(other);
+  }
+
+  /**
+   * Create a new Permissions with the same bits
+   */
+  clone(): Permissions {
+    return new Permissions(this.bitfield, this.isOwner);
+  }
+
+  /**
+   * Freeze this instance (immutable)
+   */
+  freeze(): Readonly<this> {
+    return Object.freeze(this);
   }
 
   /**
@@ -119,6 +196,32 @@ export class Permissions {
       }
     }
     return result;
+  }
+
+  /**
+   * Serialize to JSON-compatible string
+   */
+  toJSON(): string {
+    return this.bitfield.toString();
+  }
+
+  /**
+   * String representation
+   */
+  toString(): string {
+    return this.bitfield.toString();
+  }
+
+  /**
+   * Resolve a permission name or bigint to bigint
+   */
+  static resolve(permission: string | bigint): bigint {
+    if (typeof permission === 'bigint') return permission;
+    const bit = PermissionFlags[permission as keyof typeof PermissionFlags];
+    if (bit === undefined) {
+      throw new Error(`Unknown permission: ${permission}`);
+    }
+    return bit;
   }
 }
 

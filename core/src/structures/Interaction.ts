@@ -58,10 +58,8 @@ export class Interaction {
     
     // Create member if in guild
     if (data.member && this.guildId) {
-      const guild = client.guilds.get(this.guildId);
-      if (guild) {
-        this.member = new GuildMember(client, guild, data.member);
-      }
+      const guild = client.guilds.get(this.guildId) || { id: this.guildId, ownerId: null } as any;
+      this.member = new GuildMember(client, guild, data.member);
     }
   }
 

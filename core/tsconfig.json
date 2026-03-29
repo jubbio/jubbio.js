@@ -19,7 +19,7 @@
     "strictPropertyInitialization": false,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "outDir": "./dist",
+    "outDir": "./dist/cjs",
     "rootDir": "./src"
   },
   "include": ["src/**/*"],

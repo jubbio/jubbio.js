@@ -1,0 +1,12 @@
+{
+  "name": "jubbio-permission-bot-example",
+  "version": "1.0.0",
+  "description": "Example bot that checks member permissions using @jubbio/core",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@jubbio/core": "1.1.20"
+  }
+}

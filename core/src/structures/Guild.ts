@@ -60,13 +60,16 @@ export class Guild {
   /**
    * Fetch a member by ID
    */
-  async fetchMember(userId: string): Promise<GuildMember | null> {
+  async fetchMember(userId: string): Promise<GuildMember> {
     // Check cache first
     const cached = this.members.get(userId);
     if (cached) return cached;
     
-    // TODO: Fetch from API
-    return null;
+    // Fetch from API
+    const data = await this.client.rest.getMember(this.id, userId);
+    if (!data) throw new Error(`Member ${userId} not found in guild ${this.id}`);
+    const member = this._addMember(data);
+    return member;
   }
 
   /**

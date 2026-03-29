@@ -14,7 +14,7 @@ export { REST, type MentionsData, type MentionUser, type MentionRole } from './r
 export { Collection } from './structures/Collection';
 export { User } from './structures/User';
 export { Guild } from './structures/Guild';
-export { GuildMember } from './structures/GuildMember';
+export { GuildMember, Permissions, PermissionFlags } from './structures/GuildMember';
 export { Message, type MessageMentions } from './structures/Message';
 export { 
   Interaction, 

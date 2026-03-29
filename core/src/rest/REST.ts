@@ -223,6 +223,14 @@ export class REST {
             delete processedEmbed.footer.iconURL;
           }
         }
+
+        // Normalize author.iconURL → author.icon_url
+        if (processedEmbed.author) {
+          if (processedEmbed.author.iconURL && !processedEmbed.author.icon_url) {
+            processedEmbed.author = { ...processedEmbed.author, icon_url: processedEmbed.author.iconURL };
+            delete processedEmbed.author.iconURL;
+          }
+        }
         
         // Process description
         if (rawEmbed.description) {
@@ -383,6 +391,7 @@ export class REST {
   async createEphemeralMessage(guildId: string, channelId: string, targetUserId: string | number, data: {
     content?: string;
     embeds?: APIEmbed[];
+    components?: any[];
   }): Promise<{ id: string; ephemeral: boolean; flags: number }> {
     const messageData = this.prepareMessageData(data);
     

@@ -406,17 +406,47 @@ export class Client extends EventEmitter {
         break;
       }
         
-      case 'GUILD_MEMBER_ADD':
-        this.emit('guildMemberAdd', data);
+      case 'GUILD_MEMBER_ADD': {
+        const guild = this.guilds.get(String(data.guild_id));
+        if (guild && data.user) {
+          const member = guild._addMember(data);
+          this.emit('guildMemberAdd', member);
+        } else {
+          this.emit('guildMemberAdd', data);
+        }
         break;
+      }
         
-      case 'GUILD_MEMBER_UPDATE':
-        this.emit('guildMemberUpdate', data);
+      case 'GUILD_MEMBER_UPDATE': {
+        const guild = this.guilds.get(String(data.guild_id));
+        const rawUserId = data.user?.id || data.user_id;
+        if (guild && rawUserId) {
+          const existing = guild.members.get(String(rawUserId));
+          if (existing) {
+            existing._patch(data);
+            this.emit('guildMemberUpdate', existing);
+          } else {
+            this.emit('guildMemberUpdate', data);
+          }
+        } else {
+          this.emit('guildMemberUpdate', data);
+        }
         break;
+      }
         
-      case 'GUILD_MEMBER_REMOVE':
-        this.emit('guildMemberRemove', data);
+      case 'GUILD_MEMBER_REMOVE': {
+        const guild = this.guilds.get(String(data.guild_id));
+        const rawUserId = data.user?.id || data.user_id;
+        if (guild && rawUserId) {
+          const userId = String(rawUserId);
+          const member = guild.members.get(userId);
+          guild.members.delete(userId);
+          this.emit('guildMemberRemove', member || data);
+        } else {
+          this.emit('guildMemberRemove', data);
+        }
         break;
+      }
         
       case 'GUILD_ROLE_CREATE':
         this.emit('roleCreate', data);
@@ -596,6 +626,29 @@ export class Client extends EventEmitter {
     // Mark message as from bot if author ID matches the bot's own user ID
     if (this.user && String(message.author.id) === String(this.user.id)) {
       (message.author as any).bot = true;
+    }
+
+    // Resolve guild member if in a guild
+    if (message.guildId) {
+      const guild = this.guilds.get(message.guildId);
+      const memberData = (data as any).member;
+      if (memberData && guild) {
+        // Gateway sent member data with the message — cache it
+        memberData.user = data.author;
+        const member = guild._addMember(memberData);
+        message.member = member;
+      } else if (memberData) {
+        // No guild in cache but member data exists
+        memberData.user = data.author;
+        const resolvedGuild = { id: message.guildId, ownerId: null } as any;
+        message.member = new (require('./structures/GuildMember').GuildMember)(this, resolvedGuild, memberData);
+      } else if (guild) {
+        // Try cache
+        const cached = guild.members?.get(String(message.author.id));
+        if (cached?.permissions?.has) {
+          message.member = cached;
+        }
+      }
     }
 
     this.emit('messageCreate', message);

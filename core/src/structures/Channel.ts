@@ -214,11 +214,15 @@ export class VoiceChannel extends BaseChannel {
   }
 
   /**
-   * Check if the channel is joinable
+   * Check if the bot can join this voice channel
    */
   get joinable(): boolean {
-    // TODO: Check permissions
-    return true;
+    if (!this.guildId || !this.client.user) return false;
+    const guild = this.client.guilds.get(this.guildId);
+    if (!guild) return false;
+    const me = guild.members.get(String(this.client.user.id));
+    if (!me) return true; // No cached member — optimistic, server will reject if not allowed
+    return me.permissions.has('Connect');
   }
 }
 

@@ -1,5 +1,6 @@
 import { APIMessage, APIEmbed, APIAttachment } from '../types';
 import { User } from './User';
+import { GuildMember } from './GuildMember';
 import type { Client } from '../Client';
 import type { MessageCreateOptions } from './Channel';
 import { InteractionCollector, InteractionCollectorOptions } from '../utils/Collector';
@@ -45,6 +46,8 @@ export declare class Message {
     mentions: MessageMentions;
     /** User ID (from backend) */
     user_id?: number;
+    /** Guild member (if in a guild) */
+    member?: GuildMember;
     constructor(client: Client, data: APIMessage);
     /**
      * Get the creation date

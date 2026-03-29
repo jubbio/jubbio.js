@@ -62,7 +62,35 @@ export declare class Permissions {
     /**
      * Check if has a permission
      */
-    has(permission: string | bigint): boolean;
+    has(permission: string | bigint, checkAdmin?: boolean): boolean;
+    /**
+     * Check if has any of the given permissions
+     */
+    any(permissions: (string | bigint)[], checkAdmin?: boolean): boolean;
+    /**
+     * Return array of permission names that are missing
+     */
+    missing(permissions: (string | bigint)[], checkAdmin?: boolean): string[];
+    /**
+     * Add permissions to this bitfield. Chainable.
+     */
+    add(...permissions: (string | bigint)[]): this;
+    /**
+     * Remove permissions from this bitfield. Chainable.
+     */
+    remove(...permissions: (string | bigint)[]): this;
+    /**
+     * Check equality with another Permissions or bigint
+     */
+    equals(other: Permissions | bigint | string | number): boolean;
+    /**
+     * Create a new Permissions with the same bits
+     */
+    clone(): Permissions;
+    /**
+     * Freeze this instance (immutable)
+     */
+    freeze(): Readonly<this>;
     /**
      * Get the raw bitfield
      */
@@ -71,6 +99,18 @@ export declare class Permissions {
      * Convert to array of permission names
      */
     toArray(): string[];
+    /**
+     * Serialize to JSON-compatible string
+     */
+    toJSON(): string;
+    /**
+     * String representation
+     */
+    toString(): string;
+    /**
+     * Resolve a permission name or bigint to bigint
+     */
+    static resolve(permission: string | bigint): bigint;
 }
 /**
  * Represents a guild member
