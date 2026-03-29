@@ -1,15 +1,94 @@
 import { APIMessage, APIEmbed, APIAttachment } from '../types';
 import { User } from './User';
+import { GuildMember } from './GuildMember';
 import type { Client } from '../Client';
 import type { MessageCreateOptions } from './Channel';
 import { Collection } from './Collection';
 import { InteractionCollector, InteractionCollectorOptions } from '../utils/Collector';
 import { EmbedBuilder } from '../builders/EmbedBuilder';
 
+/** Backend flat embed format (for normalization) */
+interface BackendFlatEmbed {
+  title?: string;
+  description?: string;
+  url?: string;
+  timestamp?: string;
+  color?: number;
+  // Flat author fields
+  author_name?: string;
+  author_url?: string;
+  author_icon_url?: string;
+  // Flat footer fields
+  footer_text?: string;
+  footer_icon_url?: string;
+  // Flat thumbnail/image fields
+  thumbnail_url?: string;
+  image_url?: string;
+  // Or nested format
+  author?: { name: string; url?: string; icon_url?: string };
+  footer?: { text: string; icon_url?: string };
+  image?: { url: string } | string;
+  thumbnail?: { url: string } | string;
+  fields?: { name: string; value: string; inline?: boolean }[];
+}
+
 /** Resolve EmbedBuilder instances to plain API objects */
 function resolveEmbeds(embeds?: (APIEmbed | EmbedBuilder)[]): APIEmbed[] | undefined {
   if (!embeds) return undefined;
   return embeds.map(e => e instanceof EmbedBuilder ? e.toJSON() : e);
+}
+
+/** Normalize flat embed format from backend to nested format */
+function normalizeEmbed(embed: BackendFlatEmbed): APIEmbed {
+  const normalized: APIEmbed = {
+    title: embed.title,
+    description: embed.description,
+    url: embed.url,
+    timestamp: embed.timestamp,
+    color: embed.color,
+    fields: embed.fields,
+  };
+
+  // Normalize author: flat format → nested object
+  if (embed.author_name || embed.author_icon_url || embed.author_url) {
+    normalized.author = {
+      name: embed.author_name || '',
+      icon_url: embed.author_icon_url,
+      url: embed.author_url,
+    };
+  } else if (embed.author) {
+    normalized.author = embed.author;
+  }
+
+  // Normalize footer: flat format → nested object
+  if (embed.footer_text || embed.footer_icon_url) {
+    normalized.footer = {
+      text: embed.footer_text || '',
+      icon_url: embed.footer_icon_url,
+    };
+  } else if (embed.footer) {
+    normalized.footer = embed.footer;
+  }
+
+  // Normalize thumbnail: flat format or string → nested object
+  if (embed.thumbnail_url) {
+    normalized.thumbnail = { url: embed.thumbnail_url };
+  } else if (typeof embed.thumbnail === 'string') {
+    normalized.thumbnail = { url: embed.thumbnail };
+  } else if (embed.thumbnail && typeof embed.thumbnail === 'object') {
+    normalized.thumbnail = embed.thumbnail;
+  }
+
+  // Normalize image: flat format or string → nested object
+  if (embed.image_url) {
+    normalized.image = { url: embed.image_url };
+  } else if (typeof embed.image === 'string') {
+    normalized.image = { url: embed.image };
+  } else if (embed.image && typeof embed.image === 'object') {
+    normalized.image = embed.image;
+  }
+
+  return normalized;
 }
 
 /**
@@ -61,6 +140,9 @@ export class Message {
   /** User ID (from backend) */
   public user_id?: number;
 
+  /** Guild member (if in a guild) */
+  public member?: GuildMember;
+
   constructor(client: Client, data: APIMessage) {
     this.client = client;
     this.id = data.id;
@@ -77,7 +159,10 @@ export class Message {
     this.editedTimestamp = editedTimestamp ? new Date(editedTimestamp).getTime() : undefined;
     
     this.attachments = data.attachments || [];
-    this.embeds = data.embeds || [];
+    
+    // Normalize embeds from backend (flat format → nested format)
+    this.embeds = data.embeds ? data.embeds.map(normalizeEmbed) : [];
+    
     this.mentions = (data as any).mentions || {};
     this.user_id = (data as any).user_id;
   }
