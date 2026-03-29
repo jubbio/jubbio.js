@@ -19,18 +19,22 @@ export declare class ActionRowBuilder<T extends APIActionRowComponent = APIActio
     constructor(data?: Partial<APIActionRow>);
     /**
      * Adds components to this action row
-     * @param components The components to add
+     * Accepts individual components or an array of components
      */
     addComponents(...components: (T | {
         toJSON(): T;
-    })[]): this;
+    } | (T | {
+        toJSON(): T;
+    })[])[]): this;
     /**
      * Sets the components of this action row
-     * @param components The components to set
+     * Accepts individual components or an array of components
      */
     setComponents(...components: (T | {
         toJSON(): T;
-    })[]): this;
+    } | (T | {
+        toJSON(): T;
+    })[])[]): this;
     /**
      * Removes, replaces, or inserts components
      * @param index The index to start at

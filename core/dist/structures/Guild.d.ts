@@ -43,7 +43,7 @@ export declare class Guild {
     /**
      * Fetch a member by ID
      */
-    fetchMember(userId: string): Promise<GuildMember | null>;
+    fetchMember(userId: string): Promise<GuildMember>;
     /**
      * Convert to string
      */

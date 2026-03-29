@@ -54,14 +54,14 @@ export declare class StringSelectMenuBuilder {
     setDisabled(disabled?: boolean): this;
     /**
      * Adds options to this select menu
-     * @param options The options to add
+     * Accepts individual options or an array of options
      */
-    addOptions(...options: APISelectMenuOption[]): this;
+    addOptions(...options: (APISelectMenuOption | APISelectMenuOption[])[]): this;
     /**
      * Sets the options of this select menu
-     * @param options The options to set
+     * Accepts individual options or an array of options
      */
-    setOptions(...options: APISelectMenuOption[]): this;
+    setOptions(...options: (APISelectMenuOption | APISelectMenuOption[])[]): this;
     /**
      * Removes, replaces, or inserts options
      * @param index The index to start at

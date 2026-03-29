@@ -99,6 +99,13 @@ export class Interaction {
   }
 
   /**
+   * Alias for isSelectMenu (Discord.js compatibility)
+   */
+  isStringSelectMenu(): this is SelectMenuInteraction {
+    return this.isSelectMenu();
+  }
+
+  /**
    * Reply to the interaction
    */
   async reply(options: string | InteractionReplyOptions): Promise<void> {
@@ -440,8 +447,14 @@ export class ModalSubmitInteraction extends Interaction {
   constructor(client: Client, data: APIInteraction) {
     super(client, data);
     this.customId = data.data?.custom_id || '';
-    // Modal values come from components array (action rows containing text inputs)
-    const components = (data.data as any)?.components || [];
+    // Modal values come from components array, or as JSON string in values[0] (backend compat)
+    let components = (data.data as any)?.components || [];
+    if (components.length === 0 && (data.data as any)?.values?.length > 0) {
+      try {
+        const parsed = JSON.parse((data.data as any).values[0]);
+        if (Array.isArray(parsed)) components = parsed;
+      } catch {}
+    }
     this.fields = new ModalFields(components);
   }
 }

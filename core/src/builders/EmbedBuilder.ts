@@ -165,26 +165,36 @@ export class EmbedBuilder {
 
   /**
    * Adds fields to this embed (max 25 fields per embed)
-   * @param fields The fields to add
+   * Accepts individual fields or an array of fields
    */
-  addFields(...fields: APIEmbedField[]): this {
+  addFields(...fields: (APIEmbedField | APIEmbedField[])[]): this {
     if (!this.data.fields) this.data.fields = [];
-    if (this.data.fields.length + fields.length > 25) {
-      throw new RangeError(`Embed fields cannot exceed 25. Current: ${this.data.fields.length}, adding: ${fields.length}`);
+    const flat: APIEmbedField[] = [];
+    for (const f of fields) {
+      if (Array.isArray(f)) flat.push(...f);
+      else flat.push(f);
     }
-    this.data.fields.push(...fields);
+    if (this.data.fields.length + flat.length > 25) {
+      throw new RangeError(`Embed fields cannot exceed 25. Current: ${this.data.fields.length}, adding: ${flat.length}`);
+    }
+    this.data.fields.push(...flat);
     return this;
   }
 
   /**
    * Sets the fields of this embed (max 25 fields per embed)
-   * @param fields The fields to set
+   * Accepts individual fields or an array of fields
    */
-  setFields(...fields: APIEmbedField[]): this {
-    if (fields.length > 25) {
-      throw new RangeError(`Embed fields cannot exceed 25. Provided: ${fields.length}`);
+  setFields(...fields: (APIEmbedField | APIEmbedField[])[]): this {
+    const flat: APIEmbedField[] = [];
+    for (const f of fields) {
+      if (Array.isArray(f)) flat.push(...f);
+      else flat.push(f);
     }
-    this.data.fields = fields;
+    if (flat.length > 25) {
+      throw new RangeError(`Embed fields cannot exceed 25. Provided: ${flat.length}`);
+    }
+    this.data.fields = flat;
     return this;
   }
 

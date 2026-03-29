@@ -78,20 +78,33 @@ export class StringSelectMenuBuilder {
 
   /**
    * Adds options to this select menu
-   * @param options The options to add
+   * Accepts individual options or an array of options
    */
-  addOptions(...options: APISelectMenuOption[]): this {
+  addOptions(...options: (APISelectMenuOption | APISelectMenuOption[])[]): this {
     if (!this.data.options) this.data.options = [];
-    this.data.options.push(...options);
+    for (const opt of options) {
+      if (Array.isArray(opt)) {
+        this.data.options.push(...opt);
+      } else {
+        this.data.options.push(opt);
+      }
+    }
     return this;
   }
 
   /**
    * Sets the options of this select menu
-   * @param options The options to set
+   * Accepts individual options or an array of options
    */
-  setOptions(...options: APISelectMenuOption[]): this {
-    this.data.options = options;
+  setOptions(...options: (APISelectMenuOption | APISelectMenuOption[])[]): this {
+    this.data.options = [];
+    for (const opt of options) {
+      if (Array.isArray(opt)) {
+        this.data.options.push(...opt);
+      } else {
+        this.data.options.push(opt);
+      }
+    }
     return this;
   }
 

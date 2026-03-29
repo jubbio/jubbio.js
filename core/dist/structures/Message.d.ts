@@ -42,6 +42,8 @@ export declare class Message {
     attachments: APIAttachment[];
     /** Embeds */
     embeds: APIEmbed[];
+    /** Components (buttons, select menus, etc.) */
+    components: any[];
     /** Mentions in the message */
     mentions: MessageMentions;
     /** User ID (from backend) */

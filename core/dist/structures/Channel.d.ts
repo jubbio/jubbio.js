@@ -89,7 +89,7 @@ export declare class VoiceChannel extends BaseChannel {
         bitrate?: number;
     });
     /**
-     * Check if the channel is joinable
+     * Check if the bot can join this voice channel
      */
     get joinable(): boolean;
 }

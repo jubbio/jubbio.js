@@ -52,6 +52,10 @@ export declare class Interaction {
      */
     isSelectMenu(): this is SelectMenuInteraction;
     /**
+     * Alias for isSelectMenu (Discord.js compatibility)
+     */
+    isStringSelectMenu(): this is SelectMenuInteraction;
+    /**
      * Reply to the interaction
      */
     reply(options: string | InteractionReplyOptions): Promise<void>;

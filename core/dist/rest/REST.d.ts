@@ -143,6 +143,7 @@ export declare class REST {
     createEphemeralMessage(guildId: string, channelId: string, targetUserId: string | number, data: {
         content?: string;
         embeds?: APIEmbed[];
+        components?: any[];
     }): Promise<{
         id: string;
         ephemeral: boolean;

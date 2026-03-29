@@ -27,12 +27,14 @@ export class ActionRowBuilder<T extends APIActionRowComponent = APIActionRowComp
 
   /**
    * Adds components to this action row
-   * @param components The components to add
+   * Accepts individual components or an array of components
    */
-  addComponents(...components: (T | { toJSON(): T })[]): this {
+  addComponents(...components: (T | { toJSON(): T } | (T | { toJSON(): T })[])[]): this {
     for (const component of components) {
-      if ('toJSON' in component && typeof component.toJSON === 'function') {
-        this.data.components.push(component.toJSON());
+      if (Array.isArray(component)) {
+        this.addComponents(...component);
+      } else if ('toJSON' in (component as any) && typeof (component as any).toJSON === 'function') {
+        this.data.components.push((component as any).toJSON());
       } else {
         this.data.components.push(component as T);
       }
@@ -42,9 +44,9 @@ export class ActionRowBuilder<T extends APIActionRowComponent = APIActionRowComp
 
   /**
    * Sets the components of this action row
-   * @param components The components to set
+   * Accepts individual components or an array of components
    */
-  setComponents(...components: (T | { toJSON(): T })[]): this {
+  setComponents(...components: (T | { toJSON(): T } | (T | { toJSON(): T })[])[]): this {
     this.data.components = [];
     return this.addComponents(...components);
   }
