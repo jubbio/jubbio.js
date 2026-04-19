@@ -30,6 +30,7 @@ export interface APIGuild {
     name: string;
     icon?: string;
     owner_id: string;
+    member_count?: number;
     unavailable?: boolean;
 }
 /**

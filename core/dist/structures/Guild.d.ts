@@ -16,6 +16,8 @@ export declare class Guild {
     icon?: string;
     /** Owner ID */
     ownerId: string;
+    /** Member count */
+    memberCount: number;
     /** Whether the guild is unavailable */
     unavailable: boolean;
     /** Cached members */

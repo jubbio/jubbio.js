@@ -878,10 +878,10 @@ export class REST {
    */
   async getMembers(guildId: string, options?: { limit?: number; cursor?: string }): Promise<any> {
     const params = new URLSearchParams();
+    params.set('flat', 'true'); // Bot API always uses flat response (no presence grouping)
     if (options?.limit) params.set('limit', String(options.limit));
     if (options?.cursor) params.set('cursor', options.cursor);
-    const query = params.toString();
-    return this.request('GET', `/bot/guilds/${guildId}/members${query ? '?' + query : ''}`);
+    return this.request('GET', `/bot/guilds/${guildId}/members?${params.toString()}`);
   }
 
   /**

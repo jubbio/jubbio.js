@@ -22,6 +22,9 @@ export class Guild {
   /** Owner ID */
   public ownerId: string;
   
+  /** Member count */
+  public memberCount: number;
+  
   /** Whether the guild is unavailable */
   public unavailable: boolean;
   
@@ -37,6 +40,7 @@ export class Guild {
     this.name = data.name;
     this.icon = data.icon;
     this.ownerId = data.owner_id;
+    this.memberCount = data.member_count ?? 0;
     this.unavailable = data.unavailable ?? false;
     this.members = new Collection();
     this.channels = new Collection();
@@ -105,6 +109,7 @@ export class Guild {
     if (data.name !== undefined) this.name = data.name;
     if (data.icon !== undefined) this.icon = data.icon;
     if (data.owner_id !== undefined) this.ownerId = data.owner_id;
+    if (data.member_count !== undefined) this.memberCount = data.member_count;
     if (data.unavailable !== undefined) this.unavailable = data.unavailable;
   }
 
