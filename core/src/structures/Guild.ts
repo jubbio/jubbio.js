@@ -73,6 +73,25 @@ export class Guild {
   }
 
   /**
+   * Fetch guild members list (paginated)
+   * @param options.limit Max members to return (default 50)
+   * @param options.cursor Pagination cursor from previous response
+   * @returns Object with members array and pagination info
+   */
+  async fetchMembers(options?: { limit?: number; cursor?: string }): Promise<any> {
+    const data = await this.client.rest.getMembers(this.id, options);
+
+    // Cache fetched members
+    if (data?.members) {
+      for (const memberData of data.members) {
+        this._addMember(memberData);
+      }
+    }
+
+    return data;
+  }
+
+  /**
    * Convert to string
    */
   toString(): string {

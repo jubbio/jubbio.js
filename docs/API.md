@@ -368,6 +368,10 @@ guild.iconURL({ size: 128 })
 // Fetch a member
 const member = await guild.fetchMember(userId);
 
+// Fetch members list (paginated)
+const result = await guild.fetchMembers({ limit: 50 });
+const nextPage = await guild.fetchMembers({ limit: 50, cursor: result.next_cursor });
+
 // Get voice adapter (for @jubbio/voice)
 guild.voiceAdapterCreator
 ```
@@ -1037,7 +1041,19 @@ await client.rest.createDMMessage(dmChannelId, {
 ### Members
 
 ```javascript
-// Get member
+// Get members list (paginated, max 50 per page)
+const result = await client.rest.getMembers(guildId, { limit: 50 });
+// result.members — member array
+// result.next_cursor — cursor for next page (null if no more)
+
+// Next page
+const page2 = await client.rest.getMembers(guildId, { limit: 50, cursor: result.next_cursor });
+
+// Via Guild structure (also caches members automatically)
+const data = await guild.fetchMembers({ limit: 50 });
+const nextPage = await guild.fetchMembers({ limit: 50, cursor: data.next_cursor });
+
+// Get single member
 const member = await client.rest.getMember(guildId, userId);
 
 // Edit member

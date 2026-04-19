@@ -45,6 +45,16 @@ export declare class Guild {
      */
     fetchMember(userId: string): Promise<GuildMember>;
     /**
+     * Fetch guild members list (paginated)
+     * @param options.limit Max members to return (default 50)
+     * @param options.cursor Pagination cursor from previous response
+     * @returns Object with members array and pagination info
+     */
+    fetchMembers(options?: {
+        limit?: number;
+        cursor?: string;
+    }): Promise<any>;
+    /**
      * Convert to string
      */
     toString(): string;

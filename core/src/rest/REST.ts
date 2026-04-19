@@ -874,6 +874,17 @@ export class REST {
   }
 
   /**
+   * Get guild members list (paginated)
+   */
+  async getMembers(guildId: string, options?: { limit?: number; cursor?: string }): Promise<any> {
+    const params = new URLSearchParams();
+    if (options?.limit) params.set('limit', String(options.limit));
+    if (options?.cursor) params.set('cursor', options.cursor);
+    const query = params.toString();
+    return this.request('GET', `/bot/guilds/${guildId}/members${query ? '?' + query : ''}`);
+  }
+
+  /**
    * Timeout a guild member
    */
   async timeoutMember(guildId: string, userId: string, duration: number | null, reason?: string): Promise<void> {

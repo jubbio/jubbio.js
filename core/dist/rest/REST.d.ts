@@ -351,6 +351,13 @@ export declare class REST {
      */
     getMember(guildId: string, userId: string): Promise<any>;
     /**
+     * Get guild members list (paginated)
+     */
+    getMembers(guildId: string, options?: {
+        limit?: number;
+        cursor?: string;
+    }): Promise<any>;
+    /**
      * Timeout a guild member
      */
     timeoutMember(guildId: string, userId: string, duration: number | null, reason?: string): Promise<void>;
