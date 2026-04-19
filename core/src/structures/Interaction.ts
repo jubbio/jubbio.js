@@ -230,17 +230,38 @@ export class CommandInteraction extends Interaction {
 export class CommandInteractionOptions {
   private options: APIInteractionOption[];
 
+  /** Patterns that indicate code injection attempts */
+  private static readonly DANGEROUS_PATTERNS = [
+    'require(', 'import(', 'child_process', 'eval(', 'Function(',
+    'exec(', 'spawn(', 'execSync(', 'spawnSync(', '__proto__',
+    'constructor[', 'process.env', 'process.exit',
+    'fs.read', 'fs.write', 'fs.unlink',
+    'os.exec', 'os.system', 'subprocess', 'Runtime.getRuntime',
+  ];
+
+  /** Sanitize a string value by rejecting dangerous patterns */
+  private static sanitize(value: string): string {
+    const lower = value.toLowerCase();
+    for (const pattern of CommandInteractionOptions.DANGEROUS_PATTERNS) {
+      if (lower.includes(pattern.toLowerCase())) {
+        return '';
+      }
+    }
+    return value;
+  }
+
   constructor(options: APIInteractionOption[]) {
     this.options = options;
   }
 
   /**
-   * Get a string option
+   * Get a string option (sanitized against code injection)
    */
   getString(name: string, required?: boolean): string | null {
     const option = this.options.find(o => o.name === name);
     if (!option && required) throw new Error(`Required option "${name}" not found`);
-    return option?.value as string || null;
+    const raw = option?.value as string || null;
+    return raw ? CommandInteractionOptions.sanitize(raw) : null;
   }
 
   /**

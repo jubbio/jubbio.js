@@ -63,6 +63,7 @@ const client = new Client({
 | `channels` | `Collection<string, Channel>` | Cache of channels |
 | `rest` | `REST` | REST API client |
 | `voice` | `{ adapters: Map }` | Voice adapter manager |
+| `ping` | `number` | Gateway heartbeat latency in ms (-1 until first heartbeat ack) |
 
 ### Client Methods
 

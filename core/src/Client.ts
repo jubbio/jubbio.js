@@ -79,6 +79,12 @@ export class Client extends EventEmitter {
   
   /** Gateway URL */
   private gatewayUrl: string;
+
+  /** Last heartbeat sent timestamp (for ping calculation) */
+  private _lastHeartbeatSent: number = 0;
+
+  /** WebSocket ping (round-trip latency in ms) */
+  public ping: number = -1;
   
   /** Voice state update handlers (for voice adapters) */
   private voiceStateHandlers: Map<string, (data: any) => void> = new Map();
@@ -293,7 +299,10 @@ export class Client extends EventEmitter {
         break;
         
       case GatewayOpcodes.HeartbeatAck:
-        this.emit('debug', 'Heartbeat acknowledged');
+        if (this._lastHeartbeatSent > 0) {
+          this.ping = Date.now() - this._lastHeartbeatSent;
+        }
+        this.emit('debug', `Heartbeat acknowledged (ping: ${this.ping}ms)`);
         break;
         
       case GatewayOpcodes.InvalidSession:
@@ -526,6 +535,11 @@ export class Client extends EventEmitter {
     
     console.log(`✅ Bot hazır! User: ${this.user.username} (${this.user.id}), App: ${this.applicationId}`);
     this.emit('ready', this);
+
+    // Signal shard manager that this shard is ready (if running as a shard)
+    if (process.send) {
+      process.send({ _ready: true });
+    }
   }
 
   /**
@@ -728,6 +742,7 @@ export class Client extends EventEmitter {
    */
   private startHeartbeat(interval: number): void {
     this.heartbeatInterval = setInterval(() => {
+      this._lastHeartbeatSent = Date.now();
       this.send({
         op: GatewayOpcodes.Heartbeat,
         d: this.sequence

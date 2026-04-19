@@ -99,9 +99,13 @@ export declare class CommandInteraction extends Interaction {
  */
 export declare class CommandInteractionOptions {
     private options;
+    /** Patterns that indicate code injection attempts */
+    private static readonly DANGEROUS_PATTERNS;
+    /** Sanitize a string value by rejecting dangerous patterns */
+    private static sanitize;
     constructor(options: APIInteractionOption[]);
     /**
-     * Get a string option
+     * Get a string option (sanitized against code injection)
      */
     getString(name: string, required?: boolean): string | null;
     /**

@@ -51,6 +51,10 @@ export declare class Client extends EventEmitter {
     private heartbeatInterval;
     /** Gateway URL */
     private gatewayUrl;
+    /** Last heartbeat sent timestamp (for ping calculation) */
+    private _lastHeartbeatSent;
+    /** WebSocket ping (round-trip latency in ms) */
+    ping: number;
     /** Voice state update handlers (for voice adapters) */
     private voiceStateHandlers;
     private voiceServerHandlers;
