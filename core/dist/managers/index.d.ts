@@ -5,3 +5,4 @@ export * from './BaseManager';
 export * from './GuildMemberManager';
 export * from './ChannelManager';
 export * from './RoleManager';
+export * from './ApplicationCommandManager';

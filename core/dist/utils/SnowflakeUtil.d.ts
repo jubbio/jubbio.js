@@ -9,7 +9,7 @@ export declare class SnowflakeUtil {
     /**
      * Jubbio's epoch value
      */
-    static readonly EPOCH = 1420070400000n;
+    static readonly EPOCH = 1640995200000n;
     /**
      * Generates a snowflake ID
      * @param timestamp Timestamp or date to generate from

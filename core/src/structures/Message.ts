@@ -14,6 +14,23 @@ function resolveEmbeds(embeds?: (APIEmbed | EmbedBuilder)[]): APIEmbed[] | undef
   return embeds.map(e => e instanceof EmbedBuilder ? e.toJSON() : e);
 }
 
+/**
+ * Serialize components array (ActionRowBuilder/ButtonBuilder instances) to plain JSON.
+ * Handles nested structures: ActionRow → components[] → Button/SelectMenu
+ */
+function serializeComponents(components: any[] | undefined): any[] | undefined {
+  if (!components) return undefined;
+  return components.map(row => {
+    const rowData = typeof row?.toJSON === 'function' ? row.toJSON() : row;
+    if (rowData?.components && Array.isArray(rowData.components)) {
+      rowData.components = rowData.components.map((comp: any) =>
+        typeof comp?.toJSON === 'function' ? comp.toJSON() : comp
+      );
+    }
+    return rowData;
+  });
+}
+
 /** Normalize embed from backend to APIEmbed format */
 function normalizeEmbed(embed: APIEmbed & { image?: { url: string } | string; thumbnail?: { url: string } | string }): APIEmbed {
   const normalized: APIEmbed = {
@@ -127,10 +144,60 @@ export class Message {
   }
 
   /**
+   * The channel this message was sent in (resolved from guild cache)
+   * Returns null if guild or channel is not cached
+   */
+  get channel() {
+    if (this.guildId) {
+      const guild = this.client.guilds.get(this.guildId);
+      const channelData = guild?.channels.get(this.channelId);
+      if (channelData) {
+        return {
+          ...channelData,
+          id: this.channelId,
+          guildId: this.guildId,
+          name: (channelData as any).name ?? null,
+          send: async (options: string | MessageCreateOptions) => {
+            const content = typeof options === 'string' ? options : options.content;
+            const embeds = typeof options === 'string' ? undefined : resolveEmbeds(options.embeds);
+            const components = typeof options === 'string' ? undefined : serializeComponents(options.components);
+            const data = await this.client.rest.createMessage(this.guildId!, this.channelId, { content, embeds, components });
+            return new Message(this.client, data);
+          },
+          toString: () => `<#${this.channelId}>`,
+        };
+      }
+    }
+    // Fallback: minimal channel object with just ID
+    return {
+      id: this.channelId,
+      guildId: this.guildId ?? null,
+      name: null,
+      send: async (options: string | MessageCreateOptions) => {
+        const content = typeof options === 'string' ? options : options.content;
+        const embeds = typeof options === 'string' ? undefined : resolveEmbeds(options.embeds);
+        const components = typeof options === 'string' ? undefined : serializeComponents(options.components);
+        const data = await this.client.rest.createMessage(this.guildId || '', this.channelId, { content, embeds, components });
+        return new Message(this.client, data);
+      },
+      toString: () => `<#${this.channelId}>`,
+    };
+  }
+
+  /**
    * Get the creation date
    */
   get createdAt(): Date {
     return new Date(this.createdTimestamp);
+  }
+
+  /**
+   * The guild this message was sent in (if in a guild)
+   * Discord.js compatible: message.guild
+   */
+  get guild() {
+    if (!this.guildId) return null;
+    return this.client.guilds.get(this.guildId) ?? null;
   }
 
   /**
@@ -146,7 +213,7 @@ export class Message {
   async reply(options: string | MessageCreateOptions): Promise<Message> {
     const content = typeof options === 'string' ? options : options.content;
     const embeds = typeof options === 'string' ? undefined : resolveEmbeds(options.embeds);
-    const components = typeof options === 'string' ? undefined : options.components;
+    const components = typeof options === 'string' ? undefined : serializeComponents(options.components);
     
     const data = await this.client.rest.createMessage(this.guildId || '', this.channelId, {
       content,
@@ -164,7 +231,7 @@ export class Message {
   async edit(options: string | MessageCreateOptions): Promise<Message> {
     const content = typeof options === 'string' ? options : options.content;
     const embeds = typeof options === 'string' ? undefined : resolveEmbeds(options.embeds);
-    const components = typeof options === 'string' ? undefined : options.components;
+    const components = typeof options === 'string' ? undefined : serializeComponents(options.components);
     
     const data = await this.client.rest.editMessage(this.guildId || '', this.channelId, this.id, {
       content,

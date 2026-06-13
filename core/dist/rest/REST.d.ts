@@ -253,9 +253,17 @@ export declare class REST {
      */
     registerGlobalCommands(commands: APIApplicationCommand[]): Promise<void>;
     /**
+     * Bulk overwrite all global application commands (replaces all existing)
+     */
+    bulkOverwriteGlobalCommands(commands: APIApplicationCommand[]): Promise<APIApplicationCommand[]>;
+    /**
      * Register guild-specific commands
      */
     registerGuildCommands(guildId: string, commands: APIApplicationCommand[]): Promise<void>;
+    /**
+     * Bulk overwrite all guild-specific commands (replaces all existing)
+     */
+    bulkOverwriteGuildCommands(guildId: string, commands: APIApplicationCommand[]): Promise<APIApplicationCommand[]>;
     /**
      * Delete a global command
      */
@@ -530,5 +538,30 @@ export declare class REST {
      * Delete a webhook
      */
     deleteWebhook(guildId: string, webhookId: string): Promise<void>;
+    /**
+     * Make a GET request to any API path
+     * @example await client.rest.get('/bot/guilds/123/channels');
+     */
+    get<T = any>(path: string): Promise<T>;
+    /**
+     * Make a POST request to any API path
+     * @example await client.rest.post('/bot/guilds/123/channels', { name: 'new-channel', type: 2 });
+     */
+    post<T = any>(path: string, body?: any): Promise<T>;
+    /**
+     * Make a PATCH request to any API path
+     * @example await client.rest.patch('/bot/guilds/123/channels/456', { name: 'renamed' });
+     */
+    patch<T = any>(path: string, body?: any): Promise<T>;
+    /**
+     * Make a PUT request to any API path
+     * @example await client.rest.put('/bot/channels/456/permissions/789', { type: 0, allow: '1024' });
+     */
+    put<T = any>(path: string, body?: any): Promise<T>;
+    /**
+     * Make a DELETE request to any API path
+     * @example await client.rest.delete('/bot/guilds/123/channels/456');
+     */
+    delete<T = any>(path: string): Promise<T>;
 }
 export {};

@@ -19,6 +19,7 @@ import { Message } from './structures/Message';
 import { createInteraction, Interaction } from './structures/Interaction';
 import { BaseChannel, createChannel } from './structures/Channel';
 import { REST } from './rest/REST';
+import { ApplicationCommandManager } from './managers/ApplicationCommandManager';
 
 /**
  * Voice adapter creator type for @jubbio/voice compatibility
@@ -47,6 +48,12 @@ export class Client extends EventEmitter {
   
   /** Application ID */
   public applicationId: string | null = null;
+  
+  /** Application object with commands manager (Discord.js compatible) */
+  public application: {
+    id: string | null;
+    commands: ApplicationCommandManager;
+  } | null = null;
   
   /** Cached guilds */
   public guilds: Collection<string, Guild> = new Collection();
@@ -523,6 +530,12 @@ export class Client extends EventEmitter {
       this.rest.setApplicationId(this.applicationId);
     }
     
+    // Initialize application object with commands manager
+    this.application = {
+      id: this.applicationId,
+      commands: new ApplicationCommandManager(this.rest),
+    };
+    
     // Cache guilds (as unavailable initially)
     if (data.guilds) {
       for (const guild of data.guilds) {
@@ -648,18 +661,19 @@ export class Client extends EventEmitter {
       const memberData = (data as any).member;
       if (memberData && guild) {
         // Gateway sent member data with the message — cache it
+        // _addMember preserves voice state from existing cache automatically
         memberData.user = data.author;
         const member = guild._addMember(memberData);
         message.member = member;
       } else if (memberData) {
         // No guild in cache but member data exists
         memberData.user = data.author;
-        const resolvedGuild = { id: message.guildId, ownerId: null } as any;
+        const resolvedGuild = { id: message.guildId, ownerId: null, members: new Collection(), channels: new Collection() } as any;
         message.member = new (require('./structures/GuildMember').GuildMember)(this, resolvedGuild, memberData);
       } else if (guild) {
-        // Try cache
+        // No member data from gateway — use cached member (may have voice state from VOICE_STATE_UPDATE)
         const cached = guild.members?.get(String(message.author.id));
-        if (cached?.permissions?.has) {
+        if (cached) {
           message.member = cached;
         }
       }
@@ -692,6 +706,33 @@ export class Client extends EventEmitter {
    */
   private handleVoiceStateUpdate(data: any): void {
     const guildId = data.guild_id;
+    const userId = data.user_id;
+    
+    // Update member voice state in cache
+    if (guildId && userId) {
+      const guild = this.guilds.get(String(guildId));
+      if (guild) {
+        const userIdStr = String(userId);
+        let member = guild.members.get(userIdStr);
+        
+        if (!member && data.user) {
+          // Member not in cache yet — create a minimal entry from voice state data
+          member = guild._addMember({
+            user: data.user,
+            roles: [],
+            joined_at: new Date().toISOString(),
+          });
+        }
+        
+        if (member) {
+          member.voice = {
+            channelId: data.channel_id ?? undefined,
+            selfMute: data.self_mute ?? false,
+            selfDeaf: data.self_deaf ?? false,
+          };
+        }
+      }
+    }
     
     // Forward to voice adapter if exists
     const handler = this.voiceStateHandlers.get(guildId);

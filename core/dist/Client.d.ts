@@ -6,6 +6,7 @@ import { User } from './structures/User';
 import { Guild } from './structures/Guild';
 import { BaseChannel } from './structures/Channel';
 import { REST } from './rest/REST';
+import { ApplicationCommandManager } from './managers/ApplicationCommandManager';
 /**
  * Voice adapter creator type for @jubbio/voice compatibility
  */
@@ -29,6 +30,11 @@ export declare class Client extends EventEmitter {
     user: User | null;
     /** Application ID */
     applicationId: string | null;
+    /** Application object with commands manager (Discord.js compatible) */
+    application: {
+        id: string | null;
+        commands: ApplicationCommandManager;
+    } | null;
     /** Cached guilds */
     guilds: Collection<string, Guild>;
     /** Cached channels */

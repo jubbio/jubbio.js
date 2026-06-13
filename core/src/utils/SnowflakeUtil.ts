@@ -3,8 +3,8 @@
  * API compatible with Discord.js SnowflakeUtil
  */
 
-// Jubbio epoch (same as Discord: 2015-01-01T00:00:00.000Z)
-const EPOCH = 1420070400000n;
+// Jubbio epoch (2022-01-01T00:00:00.000Z)
+const EPOCH = 1640995200000n;
 
 /**
  * A container for useful snowflake-related methods

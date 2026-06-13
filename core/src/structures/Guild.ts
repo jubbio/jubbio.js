@@ -1,6 +1,7 @@
 import { APIGuild, APIChannel, APIGuildMember } from '../types';
 import { Collection } from './Collection';
 import { GuildMember } from './GuildMember';
+import { ApplicationCommandManager } from '../managers/ApplicationCommandManager';
 import type { Client } from '../Client';
 
 /**
@@ -34,6 +35,9 @@ export class Guild {
   /** Cached channels */
   public channels: Collection<string, APIChannel>;
 
+  /** Guild-specific slash commands manager */
+  public readonly commands: ApplicationCommandManager;
+
   constructor(client: Client, data: APIGuild) {
     this.client = client;
     this.id = data.id;
@@ -44,6 +48,15 @@ export class Guild {
     this.unavailable = data.unavailable ?? false;
     this.members = new Collection();
     this.channels = new Collection();
+    this.commands = new ApplicationCommandManager(client.rest, this.id);
+    
+    // Cache channels from initial data (READY or GUILD_CREATE)
+    if (data.channels) {
+      for (const channel of data.channels) {
+        const channelId = String(channel.id);
+        this.channels.set(channelId, channel);
+      }
+    }
   }
 
   /**
@@ -111,13 +124,28 @@ export class Guild {
     if (data.owner_id !== undefined) this.ownerId = data.owner_id;
     if (data.member_count !== undefined) this.memberCount = data.member_count;
     if (data.unavailable !== undefined) this.unavailable = data.unavailable;
+    if (data.channels) {
+      for (const channel of data.channels) {
+        this.channels.set(String(channel.id), channel);
+      }
+    }
   }
 
   /**
    * Add a member to cache
+   * Preserves voice state from existing cached member if new data doesn't include it
    */
   _addMember(data: APIGuildMember): GuildMember {
     const member = new GuildMember(this.client, this, data);
+    
+    // Preserve voice state from cache if the new data doesn't have it
+    if (!data.voice?.channel_id) {
+      const existing = this.members.get(member.id);
+      if (existing?.voice?.channelId) {
+        member.voice = { ...existing.voice };
+      }
+    }
+    
     this.members.set(member.id, member);
     return member;
   }

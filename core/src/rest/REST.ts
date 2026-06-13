@@ -678,6 +678,14 @@ export class REST {
   }
 
   /**
+   * Bulk overwrite all global application commands (replaces all existing)
+   */
+  async bulkOverwriteGlobalCommands(commands: APIApplicationCommand[]): Promise<APIApplicationCommand[]> {
+    const appId = this.getApplicationId();
+    return this.request<APIApplicationCommand[]>('PUT', `/applications/${appId}/commands`, commands);
+  }
+
+  /**
    * Register guild-specific commands
    */
   async registerGuildCommands(guildId: string, commands: APIApplicationCommand[]): Promise<void> {
@@ -686,6 +694,14 @@ export class REST {
     for (const command of commands) {
       await this.request<void>('POST', `/applications/${appId}/guilds/${guildId}/commands`, command);
     }
+  }
+
+  /**
+   * Bulk overwrite all guild-specific commands (replaces all existing)
+   */
+  async bulkOverwriteGuildCommands(guildId: string, commands: APIApplicationCommand[]): Promise<APIApplicationCommand[]> {
+    const appId = this.getApplicationId();
+    return this.request<APIApplicationCommand[]>('PUT', `/applications/${appId}/guilds/${guildId}/commands`, commands);
   }
 
   /**
@@ -1180,5 +1196,47 @@ export class REST {
    */
   async deleteWebhook(guildId: string, webhookId: string): Promise<void> {
     return this.request('DELETE', `/bot/guilds/${guildId}/webhooks/${webhookId}`);
+  }
+
+  // ==================== Generic HTTP Methods ====================
+
+  /**
+   * Make a GET request to any API path
+   * @example await client.rest.get('/bot/guilds/123/channels');
+   */
+  async get<T = any>(path: string): Promise<T> {
+    return this.request<T>('GET', path);
+  }
+
+  /**
+   * Make a POST request to any API path
+   * @example await client.rest.post('/bot/guilds/123/channels', { name: 'new-channel', type: 2 });
+   */
+  async post<T = any>(path: string, body?: any): Promise<T> {
+    return this.request<T>('POST', path, body);
+  }
+
+  /**
+   * Make a PATCH request to any API path
+   * @example await client.rest.patch('/bot/guilds/123/channels/456', { name: 'renamed' });
+   */
+  async patch<T = any>(path: string, body?: any): Promise<T> {
+    return this.request<T>('PATCH', path, body);
+  }
+
+  /**
+   * Make a PUT request to any API path
+   * @example await client.rest.put('/bot/channels/456/permissions/789', { type: 0, allow: '1024' });
+   */
+  async put<T = any>(path: string, body?: any): Promise<T> {
+    return this.request<T>('PUT', path, body);
+  }
+
+  /**
+   * Make a DELETE request to any API path
+   * @example await client.rest.delete('/bot/guilds/123/channels/456');
+   */
+  async delete<T = any>(path: string): Promise<T> {
+    return this.request<T>('DELETE', path);
   }
 }

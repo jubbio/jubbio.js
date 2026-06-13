@@ -1,4 +1,4 @@
-import { APIInteraction, APIInteractionOption, APIEmbed } from '../types';
+import { APIInteraction, APIInteractionOption, APIInteractionResolved, APIEmbed } from '../types';
 import { InteractionType } from '../enums';
 import { User } from './User';
 import { GuildMember } from './GuildMember';
@@ -31,6 +31,11 @@ export declare class Interaction {
     /** Whether the interaction has been deferred */
     deferred: boolean;
     constructor(client: Client, data: APIInteraction);
+    /**
+     * The guild this interaction was sent in (if in a guild)
+     * Discord.js compatible: interaction.guild
+     */
+    get guild(): import("./Guild").Guild | null;
     /**
      * Check if this is a command interaction
      */
@@ -99,11 +104,12 @@ export declare class CommandInteraction extends Interaction {
  */
 export declare class CommandInteractionOptions {
     private options;
+    private resolved?;
     /** Patterns that indicate code injection attempts */
     private static readonly DANGEROUS_PATTERNS;
     /** Sanitize a string value by rejecting dangerous patterns */
     private static sanitize;
-    constructor(options: APIInteractionOption[]);
+    constructor(options: APIInteractionOption[], resolved?: APIInteractionResolved);
     /**
      * Get a string option (sanitized against code injection)
      */
@@ -121,9 +127,14 @@ export declare class CommandInteractionOptions {
      */
     getBoolean(name: string, required?: boolean): boolean | null;
     /**
-     * Get a user option
+     * Get a user option — returns resolved User object if available
+     * Falls back to parsing mention format (<@ID>) and resolving from resolved data
      */
-    getUser(name: string, required?: boolean): string | null;
+    getUser(name: string, required?: boolean): User | null;
+    /**
+     * Get raw user ID from a user option (for cases where only the ID is needed)
+     */
+    getUserId(name: string, required?: boolean): string | null;
     /**
      * Get a channel option
      */

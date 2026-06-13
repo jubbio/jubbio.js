@@ -32,6 +32,7 @@ export interface APIGuild {
     owner_id: string;
     member_count?: number;
     unavailable?: boolean;
+    channels?: APIChannel[];
 }
 /**
  * Channel structure

@@ -52,9 +52,36 @@ export declare class Message {
     member?: GuildMember;
     constructor(client: Client, data: APIMessage);
     /**
+     * The channel this message was sent in (resolved from guild cache)
+     * Returns null if guild or channel is not cached
+     */
+    get channel(): {
+        id: string;
+        guildId: string;
+        name: any;
+        send: (options: string | MessageCreateOptions) => Promise<Message>;
+        toString: () => string;
+        type: import("..").ChannelType;
+        guild_id?: string;
+        topic?: string;
+        position?: number;
+        parent_id?: string;
+    } | {
+        id: string;
+        guildId: string | null;
+        name: null;
+        send: (options: string | MessageCreateOptions) => Promise<Message>;
+        toString: () => string;
+    };
+    /**
      * Get the creation date
      */
     get createdAt(): Date;
+    /**
+     * The guild this message was sent in (if in a guild)
+     * Discord.js compatible: message.guild
+     */
+    get guild(): import("./Guild").Guild | null;
     /**
      * Get the edit date
      */

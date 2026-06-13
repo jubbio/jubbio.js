@@ -1,6 +1,7 @@
 import { APIGuild, APIChannel, APIGuildMember } from '../types';
 import { Collection } from './Collection';
 import { GuildMember } from './GuildMember';
+import { ApplicationCommandManager } from '../managers/ApplicationCommandManager';
 import type { Client } from '../Client';
 /**
  * Represents a guild
@@ -24,6 +25,8 @@ export declare class Guild {
     members: Collection<string, GuildMember>;
     /** Cached channels */
     channels: Collection<string, APIChannel>;
+    /** Guild-specific slash commands manager */
+    readonly commands: ApplicationCommandManager;
     constructor(client: Client, data: APIGuild);
     /**
      * Get the guild icon URL
@@ -66,6 +69,7 @@ export declare class Guild {
     _patch(data: Partial<APIGuild>): void;
     /**
      * Add a member to cache
+     * Preserves voice state from existing cached member if new data doesn't include it
      */
     _addMember(data: APIGuildMember): GuildMember;
 }

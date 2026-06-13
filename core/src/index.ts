@@ -15,6 +15,9 @@ export { Collection } from './structures/Collection';
 export { User } from './structures/User';
 export { Guild } from './structures/Guild';
 export { GuildMember, Permissions, PermissionFlags } from './structures/GuildMember';
+
+// Managers
+export { ApplicationCommandManager } from './managers/ApplicationCommandManager';
 export { Message, type MessageMentions } from './structures/Message';
 export { 
   Interaction, 

@@ -1,9 +1,29 @@
-import { APIInteraction, APIInteractionOption, APIEmbed } from '../types';
+import { APIInteraction, APIInteractionOption, APIInteractionResolved, APIEmbed } from '../types';
 import { InteractionType, InteractionResponseType, MessageFlags } from '../enums';
 import { User } from './User';
 import { GuildMember } from './GuildMember';
+import { Collection } from './Collection';
 import { EmbedBuilder } from '../builders/EmbedBuilder';
 import type { Client } from '../Client';
+
+/**
+ * Serialize components array (ActionRowBuilder/ButtonBuilder instances) to plain JSON.
+ * Handles nested structures: ActionRow → components[] → Button/SelectMenu
+ */
+function serializeComponents(components: any[] | undefined): any[] | undefined {
+  if (!components) return undefined;
+  return components.map(row => {
+    // If it has a toJSON method (ActionRowBuilder), call it
+    const rowData = typeof row?.toJSON === 'function' ? row.toJSON() : row;
+    // Also serialize nested components (buttons, select menus inside action rows)
+    if (rowData?.components && Array.isArray(rowData.components)) {
+      rowData.components = rowData.components.map((comp: any) =>
+        typeof comp?.toJSON === 'function' ? comp.toJSON() : comp
+      );
+    }
+    return rowData;
+  });
+}
 
 /**
  * Base interaction class
@@ -58,9 +78,32 @@ export class Interaction {
     
     // Create member if in guild
     if (data.member && this.guildId) {
-      const guild = client.guilds.get(this.guildId) || { id: this.guildId, ownerId: null } as any;
-      this.member = new GuildMember(client, guild, data.member);
+      const guild = client.guilds.get(this.guildId);
+      if (guild) {
+        this.member = new GuildMember(client, guild, data.member);
+        
+        // If backend didn't send voice state, try to fill from cache
+        if (!data.member.voice?.channel_id) {
+          const cachedMember = guild.members.get(this.member.id);
+          if (cachedMember?.voice?.channelId) {
+            this.member.voice = { ...cachedMember.voice };
+          }
+        }
+      } else {
+        // Guild not in cache — create member with a minimal guild stub
+        const stubGuild = { id: this.guildId, ownerId: null, members: new Collection(), channels: new Collection() } as any;
+        this.member = new GuildMember(client, stubGuild, data.member);
+      }
     }
+  }
+
+  /**
+   * The guild this interaction was sent in (if in a guild)
+   * Discord.js compatible: interaction.guild
+   */
+  get guild() {
+    if (!this.guildId) return null;
+    return this.client.guilds.get(this.guildId) ?? null;
   }
 
   /**
@@ -115,11 +158,13 @@ export class Interaction {
     
     const content = typeof options === 'string' ? options : options.content;
     const rawEmbeds = typeof options === 'string' ? undefined : options.embeds;
-    const components = typeof options === 'string' ? undefined : options.components;
+    const rawComponents = typeof options === 'string' ? undefined : options.components;
     const ephemeral = typeof options === 'string' ? false : options.ephemeral;
     
     // Convert EmbedBuilder instances to plain objects
     const embeds = rawEmbeds?.map(e => e instanceof EmbedBuilder ? e.toJSON() : e);
+    // Convert ActionRowBuilder/ButtonBuilder instances to plain objects
+    const components = serializeComponents(rawComponents);
     
     await this.client.rest.createInteractionResponse(this.id, this.token, {
       type: InteractionResponseType.ChannelMessageWithSource,
@@ -156,11 +201,13 @@ export class Interaction {
   async editReply(options: string | InteractionReplyOptions): Promise<void> {
     const content = typeof options === 'string' ? options : options.content;
     const rawEmbeds = typeof options === 'string' ? undefined : options.embeds;
-    const components = typeof options === 'string' ? undefined : options.components;
+    const rawComponents = typeof options === 'string' ? undefined : options.components;
     const files = typeof options === 'string' ? undefined : options.files;
     
     // Convert EmbedBuilder instances to plain objects
     const embeds = rawEmbeds?.map(e => e instanceof EmbedBuilder ? e.toJSON() : e);
+    // Convert ActionRowBuilder/ButtonBuilder instances to plain objects
+    const components = serializeComponents(rawComponents);
     
     await this.client.rest.editInteractionResponse(this.token, {
       content,
@@ -209,7 +256,7 @@ export class CommandInteraction extends Interaction {
   constructor(client: Client, data: APIInteraction) {
     super(client, data);
     this.commandName = data.data?.name || '';
-    this.options = new CommandInteractionOptions(data.data?.options || []);
+    this.options = new CommandInteractionOptions(data.data?.options || [], data.data?.resolved);
   }
 
   /**
@@ -229,6 +276,7 @@ export class CommandInteraction extends Interaction {
  */
 export class CommandInteractionOptions {
   private options: APIInteractionOption[];
+  private resolved?: APIInteractionResolved;
 
   /** Patterns that indicate code injection attempts */
   private static readonly DANGEROUS_PATTERNS = [
@@ -250,8 +298,9 @@ export class CommandInteractionOptions {
     return value;
   }
 
-  constructor(options: APIInteractionOption[]) {
+  constructor(options: APIInteractionOption[], resolved?: APIInteractionResolved) {
     this.options = options;
+    this.resolved = resolved;
   }
 
   /**
@@ -290,12 +339,44 @@ export class CommandInteractionOptions {
   }
 
   /**
-   * Get a user option
+   * Get a user option — returns resolved User object if available
+   * Falls back to parsing mention format (<@ID>) and resolving from resolved data
    */
-  getUser(name: string, required?: boolean): string | null {
+  getUser(name: string, required?: boolean): User | null {
     const option = this.options.find(o => o.name === name);
     if (!option && required) throw new Error(`Required option "${name}" not found`);
-    return option?.value as string || null;
+    if (!option) return null;
+
+    const rawValue = String(option.value || '');
+
+    // Extract user ID — could be "123", "<@123>", or "<@!123>"
+    const match = rawValue.match(/^<?@?!?(\d+)>?$/);
+    const userId = match ? match[1] : rawValue;
+
+    // Try to resolve from resolved data
+    if (this.resolved?.users && this.resolved.users[userId]) {
+      return new User(this.resolved.users[userId]);
+    }
+
+    // Fallback: return a minimal User with just the ID
+    if (userId && /^\d+$/.test(userId)) {
+      return new User({ id: userId, username: `User_${userId}` });
+    }
+
+    return null;
+  }
+
+  /**
+   * Get raw user ID from a user option (for cases where only the ID is needed)
+   */
+  getUserId(name: string, required?: boolean): string | null {
+    const option = this.options.find(o => o.name === name);
+    if (!option && required) throw new Error(`Required option "${name}" not found`);
+    if (!option) return null;
+
+    const rawValue = String(option.value || '');
+    const match = rawValue.match(/^<?@?!?(\d+)>?$/);
+    return match ? match[1] : rawValue;
   }
 
   /**
@@ -339,7 +420,7 @@ export class AutocompleteInteraction extends Interaction {
   constructor(client: Client, data: APIInteraction) {
     super(client, data);
     this.commandName = data.data?.name || '';
-    this.options = new CommandInteractionOptions(data.data?.options || []);
+    this.options = new CommandInteractionOptions(data.data?.options || [], data.data?.resolved);
   }
 
   /**
@@ -378,13 +459,15 @@ export class ButtonInteraction extends Interaction {
   async update(options: InteractionReplyOptions): Promise<void> {
     // Convert EmbedBuilder instances to plain objects
     const embeds = options.embeds?.map(e => e instanceof EmbedBuilder ? e.toJSON() : e);
+    // Convert ActionRowBuilder/ButtonBuilder instances to plain objects
+    const components = serializeComponents(options.components);
     
     await this.client.rest.createInteractionResponse(this.id, this.token, {
       type: InteractionResponseType.UpdateMessage,
       data: {
         content: options.content,
         embeds,
-        components: options.components
+        components
       }
     });
     this.replied = true;
@@ -431,13 +514,15 @@ export class SelectMenuInteraction extends Interaction {
   async update(options: InteractionReplyOptions): Promise<void> {
     // Convert EmbedBuilder instances to plain objects
     const embeds = options.embeds?.map(e => e instanceof EmbedBuilder ? e.toJSON() : e);
+    // Convert ActionRowBuilder/ButtonBuilder instances to plain objects
+    const components = serializeComponents(options.components);
     
     await this.client.rest.createInteractionResponse(this.id, this.token, {
       type: InteractionResponseType.UpdateMessage,
       data: {
         content: options.content,
         embeds,
-        components: options.components
+        components
       }
     });
     this.replied = true;

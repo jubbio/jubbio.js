@@ -3,6 +3,11 @@
  */
 export declare class Collection<K, V> extends Map<K, V> {
     /**
+     * Discord.js compatibility — returns itself
+     * Allows client.guilds.cache.get() to work
+     */
+    get cache(): this;
+    /**
      * Get the first value in the collection
      */
     first(): V | undefined;
