@@ -82,9 +82,17 @@ export declare enum ChannelType {
     GroupDM = 3,
     GuildCategory = 4,
     GuildAnnouncement = 5,
+    AnnouncementThread = 10,
+    PublicThread = 11,
+    PrivateThread = 12,
     GuildStageVoice = 13,
     GuildDirectory = 14,
-    GuildForum = 15
+    GuildForum = 15,
+    /** Rules channel - server rules and guidelines */
+    GuildRules = 20,
+    /** Stream channel - for live streaming */
+    GuildStream = 21,
+    GuildApp = 22
 }
 /**
  * Interaction Response Types

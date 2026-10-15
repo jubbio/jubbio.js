@@ -5,12 +5,16 @@ export class Collection<K, V> extends Map<K, V> {
   /**
    * Identical to Map.get()
    * Ensures the value exists
+   * @param key The key to get
+   * @param defaultValue The default value or a generator function (key, collection) => V
    */
-  ensure(key: K, defaultValueGenerator: (key: K, collection: this) => V): V {
+  ensure(key: K, defaultValue: V | ((key: K, collection: this) => V)): V {
     if (this.has(key)) return this.get(key)!;
-    const defaultValue = defaultValueGenerator(key, this);
-    this.set(key, defaultValue);
-    return defaultValue;
+    const value = typeof defaultValue === 'function' 
+      ? (defaultValue as (key: K, collection: this) => V)(key, this) 
+      : defaultValue;
+    this.set(key, value);
+    return value;
   }
 
   /**

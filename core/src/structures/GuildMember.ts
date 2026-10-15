@@ -2,228 +2,7 @@ import { APIGuildMember } from '../types';
 import { User } from './User';
 import { Guild } from './Guild';
 import type { Client } from '../Client';
-
-/**
- * Permission flags - permission bits
- * Must match community-service/internal/guild/models/permissions.go (truth of source)
- */
-export const PermissionFlags = {
-  // General (0-9)
-  CreateInstantInvite: 1n << 0n,
-  KickMembers: 1n << 1n,
-  BanMembers: 1n << 2n,
-  Administrator: 1n << 3n,
-  ManageChannels: 1n << 4n,
-  ManageGuild: 1n << 5n,
-  AddReactions: 1n << 6n,
-  ViewAuditLog: 1n << 7n,
-  ViewGuildInsights: 1n << 8n,
-  Stream: 1n << 9n,
-  ViewChannel: 1n << 10n,
-
-  // Messages (11-19)
-  SendMessages: 1n << 11n,
-  SendTTSMessages: 1n << 12n,
-  ManageMessages: 1n << 13n,
-  EmbedLinks: 1n << 14n,
-  AttachFiles: 1n << 15n,
-  ReadMessageHistory: 1n << 16n,
-  UseExternalEmojis: 1n << 17n,
-  UseSlashCommands: 1n << 18n,
-  MentionEveryone: 1n << 19n,
-
-  // Voice (20-27)
-  Connect: 1n << 20n,
-  Speak: 1n << 21n,
-  MuteMembers: 1n << 22n,
-  DeafenMembers: 1n << 23n,
-  MoveMembers: 1n << 24n,
-  UseVAD: 1n << 25n,
-  ChangeCodec: 1n << 26n,
-  AudioQualityAdmin: 1n << 27n,
-
-  // Video and Screen Sharing (28-37)
-  VideoCall: 1n << 28n,
-  ShareScreen: 1n << 29n,
-  ShareCamera: 1n << 30n,
-  ControlQuality: 1n << 31n,
-  RequestToSpeak: 1n << 32n,
-  ManageEvents: 1n << 33n,
-  AddMembers: 1n << 34n,
-  RemoveMembers: 1n << 35n,
-  ChangeGroupIcon: 1n << 36n,
-  ChangeDMSettings: 1n << 37n,
-
-  // Advanced (38-43)
-  ManageGroup: 1n << 38n,
-  UseActivities: 1n << 39n,
-  ModerateMembers: 1n << 40n,
-  ManageRoles: 1n << 41n,
-  ManageEmojis: 1n << 42n,
-  PrioritySpeaker: 1n << 43n,
-} as const;
-
-/**
- * Permissions helper class
- */
-export class Permissions {
-  private bitfield: bigint;
-  private isOwner: boolean;
-
-  constructor(bits: string | bigint | number = 0n, isOwner = false) {
-    if (typeof bits === 'string') {
-      this.bitfield = BigInt(bits);
-    } else {
-      this.bitfield = BigInt(bits);
-    }
-    this.isOwner = isOwner;
-  }
-
-  /**
-   * Check if has a permission
-   */
-  has(permission: string | bigint, checkAdmin = true): boolean {
-    // Owner has all permissions
-    if (this.isOwner) return true;
-    
-    // Administrator has all permissions
-    if (checkAdmin && (this.bitfield & PermissionFlags.Administrator) === PermissionFlags.Administrator) {
-      return true;
-    }
-    
-    const bit = Permissions.resolve(permission);
-    return (this.bitfield & bit) === bit;
-  }
-
-  /**
-   * Check if has any of the given permissions
-   */
-  any(permissions: (string | bigint)[], checkAdmin = true): boolean {
-    // Owner has all permissions
-    if (this.isOwner) return true;
-    
-    // Administrator has all permissions
-    if (checkAdmin && (this.bitfield & PermissionFlags.Administrator) === PermissionFlags.Administrator) {
-      return true;
-    }
-    
-    for (const permission of permissions) {
-      const bit = Permissions.resolve(permission);
-      if ((this.bitfield & bit) === bit) return true;
-    }
-    
-    return false;
-  }
-
-  /**
-   * Return array of permission names that are missing
-   */
-  missing(permissions: (string | bigint)[], checkAdmin = true): string[] {
-    const missing: string[] = [];
-    for (const permission of permissions) {
-      if (!this.has(permission, checkAdmin)) {
-        if (typeof permission === 'string') {
-          missing.push(permission);
-        } else {
-          // Reverse lookup name from bigint
-          const name = Object.entries(PermissionFlags).find(([, v]) => v === permission)?.[0];
-          missing.push(name || permission.toString());
-        }
-      }
-    }
-    return missing;
-  }
-
-  /**
-   * Add permissions to this bitfield. Chainable.
-   */
-  add(...permissions: (string | bigint)[]): this {
-    for (const permission of permissions) {
-      this.bitfield |= Permissions.resolve(permission);
-    }
-    return this;
-  }
-
-  /**
-   * Remove permissions from this bitfield. Chainable.
-   */
-  remove(...permissions: (string | bigint)[]): this {
-    for (const permission of permissions) {
-      this.bitfield &= ~Permissions.resolve(permission);
-    }
-    return this;
-  }
-
-  /**
-   * Check equality with another Permissions or bigint
-   */
-  equals(other: Permissions | bigint | string | number): boolean {
-    if (other instanceof Permissions) {
-      return this.bitfield === other.bitfield;
-    }
-    return this.bitfield === BigInt(other);
-  }
-
-  /**
-   * Create a new Permissions with the same bits
-   */
-  clone(): Permissions {
-    return new Permissions(this.bitfield, this.isOwner);
-  }
-
-  /**
-   * Freeze this instance (immutable)
-   */
-  freeze(): Readonly<this> {
-    return Object.freeze(this);
-  }
-
-  /**
-   * Get the raw bitfield
-   */
-  get bits(): bigint {
-    return this.bitfield;
-  }
-
-  /**
-   * Convert to array of permission names
-   */
-  toArray(): string[] {
-    const result: string[] = [];
-    for (const [name, bit] of Object.entries(PermissionFlags)) {
-      if ((this.bitfield & bit) === bit) {
-        result.push(name);
-      }
-    }
-    return result;
-  }
-
-  /**
-   * Serialize to JSON-compatible string
-   */
-  toJSON(): string {
-    return this.bitfield.toString();
-  }
-
-  /**
-   * String representation
-   */
-  toString(): string {
-    return this.bitfield.toString();
-  }
-
-  /**
-   * Resolve a permission name or bigint to bigint
-   */
-  static resolve(permission: string | bigint): bigint {
-    if (typeof permission === 'bigint') return permission;
-    const bit = PermissionFlags[permission as keyof typeof PermissionFlags];
-    if (bit === undefined) {
-      throw new Error(`Unknown permission: ${permission}`);
-    }
-    return bit;
-  }
-}
+import { PermissionsBitField } from '../utils/PermissionsBitField';
 
 /**
  * Represents a guild member
@@ -258,12 +37,12 @@ export class GuildMember {
   };
   
   /** Member permissions */
-  public permissions: Permissions;
+  public permissions: PermissionsBitField;
 
   constructor(client: Client, guild: Guild, data: APIGuildMember) {
     this.client = client;
     this.guild = guild;
-    this.user = data.user ? new User(data.user) : new User({ id: '0', username: 'Unknown' });
+    this.user = data.user ? new User(data.user, client) : new User({ id: '0', username: 'Unknown' }, client);
     this.nickname = data.nick;
     this.avatar = data.avatar;
     this.roles = data.roles;
@@ -278,7 +57,8 @@ export class GuildMember {
     const isOwner = guild.ownerId === this.user.id;
     
     // Parse permissions from interaction data
-    this.permissions = new Permissions(data.permissions || '0', isOwner);
+    const permBits = data.permissions ? BigInt(data.permissions) : 0n;
+    this.permissions = new PermissionsBitField(permBits, isOwner);
   }
 
   /**

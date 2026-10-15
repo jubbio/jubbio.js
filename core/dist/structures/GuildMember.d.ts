@@ -2,116 +2,7 @@ import { APIGuildMember } from '../types';
 import { User } from './User';
 import { Guild } from './Guild';
 import type { Client } from '../Client';
-/**
- * Permission flags - permission bits
- * Must match community-service/internal/guild/models/permissions.go (truth of source)
- */
-export declare const PermissionFlags: {
-    readonly CreateInstantInvite: bigint;
-    readonly KickMembers: bigint;
-    readonly BanMembers: bigint;
-    readonly Administrator: bigint;
-    readonly ManageChannels: bigint;
-    readonly ManageGuild: bigint;
-    readonly AddReactions: bigint;
-    readonly ViewAuditLog: bigint;
-    readonly ViewGuildInsights: bigint;
-    readonly Stream: bigint;
-    readonly ViewChannel: bigint;
-    readonly SendMessages: bigint;
-    readonly SendTTSMessages: bigint;
-    readonly ManageMessages: bigint;
-    readonly EmbedLinks: bigint;
-    readonly AttachFiles: bigint;
-    readonly ReadMessageHistory: bigint;
-    readonly UseExternalEmojis: bigint;
-    readonly UseSlashCommands: bigint;
-    readonly MentionEveryone: bigint;
-    readonly Connect: bigint;
-    readonly Speak: bigint;
-    readonly MuteMembers: bigint;
-    readonly DeafenMembers: bigint;
-    readonly MoveMembers: bigint;
-    readonly UseVAD: bigint;
-    readonly ChangeCodec: bigint;
-    readonly AudioQualityAdmin: bigint;
-    readonly VideoCall: bigint;
-    readonly ShareScreen: bigint;
-    readonly ShareCamera: bigint;
-    readonly ControlQuality: bigint;
-    readonly RequestToSpeak: bigint;
-    readonly ManageEvents: bigint;
-    readonly AddMembers: bigint;
-    readonly RemoveMembers: bigint;
-    readonly ChangeGroupIcon: bigint;
-    readonly ChangeDMSettings: bigint;
-    readonly ManageGroup: bigint;
-    readonly UseActivities: bigint;
-    readonly ModerateMembers: bigint;
-    readonly ManageRoles: bigint;
-    readonly ManageEmojis: bigint;
-    readonly PrioritySpeaker: bigint;
-};
-/**
- * Permissions helper class
- */
-export declare class Permissions {
-    private bitfield;
-    private isOwner;
-    constructor(bits?: string | bigint | number, isOwner?: boolean);
-    /**
-     * Check if has a permission
-     */
-    has(permission: string | bigint, checkAdmin?: boolean): boolean;
-    /**
-     * Check if has any of the given permissions
-     */
-    any(permissions: (string | bigint)[], checkAdmin?: boolean): boolean;
-    /**
-     * Return array of permission names that are missing
-     */
-    missing(permissions: (string | bigint)[], checkAdmin?: boolean): string[];
-    /**
-     * Add permissions to this bitfield. Chainable.
-     */
-    add(...permissions: (string | bigint)[]): this;
-    /**
-     * Remove permissions from this bitfield. Chainable.
-     */
-    remove(...permissions: (string | bigint)[]): this;
-    /**
-     * Check equality with another Permissions or bigint
-     */
-    equals(other: Permissions | bigint | string | number): boolean;
-    /**
-     * Create a new Permissions with the same bits
-     */
-    clone(): Permissions;
-    /**
-     * Freeze this instance (immutable)
-     */
-    freeze(): Readonly<this>;
-    /**
-     * Get the raw bitfield
-     */
-    get bits(): bigint;
-    /**
-     * Convert to array of permission names
-     */
-    toArray(): string[];
-    /**
-     * Serialize to JSON-compatible string
-     */
-    toJSON(): string;
-    /**
-     * String representation
-     */
-    toString(): string;
-    /**
-     * Resolve a permission name or bigint to bigint
-     */
-    static resolve(permission: string | bigint): bigint;
-}
+import { PermissionsBitField } from '../utils/PermissionsBitField';
 /**
  * Represents a guild member
  */
@@ -137,7 +28,7 @@ export declare class GuildMember {
         selfDeaf: boolean;
     };
     /** Member permissions */
-    permissions: Permissions;
+    permissions: PermissionsBitField;
     constructor(client: Client, guild: Guild, data: APIGuildMember);
     /**
      * Get the member's ID

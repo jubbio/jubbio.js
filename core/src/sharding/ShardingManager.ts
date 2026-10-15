@@ -1,5 +1,23 @@
 /**
  * ShardingManager - Multi-process bot support
+ * 
+ * SECURITY WARNING: This module contains eval() functionality for cross-shard communication.
+ * The eval() method executes arbitrary code and should NEVER be exposed to external users.
+ * 
+ * Safe usage:
+ * - Only call eval() with code you wrote yourself
+ * - Never pass user input to eval()
+ * - Never expose eval() through commands or APIs
+ * 
+ * Example of UNSAFE code (DO NOT DO THIS):
+ * ```js
+ * // DANGEROUS - user can execute arbitrary code!
+ * client.on('messageCreate', (msg) => {
+ *   if (msg.content.startsWith('!eval')) {
+ *     shard.eval(msg.content.slice(6)); // RCE VULNERABILITY!
+ *   }
+ * });
+ * ```
  */
 
 import { EventEmitter } from 'events';
@@ -148,8 +166,26 @@ export class Shard extends EventEmitter {
 
   /**
    * Evaluate code on the shard
+   * 
+   * ⚠️ SECURITY WARNING: This method executes arbitrary code on the shard process.
+   * NEVER pass user input to this method - it will result in Remote Code Execution (RCE).
+   * 
+   * @param script - Code to evaluate (string or function)
+   * @returns Promise resolving to the evaluation result
+   * 
+   * @example
+   * // Safe: hardcoded code
+   * const guildCount = await shard.eval(client => client.guilds.cache.size);
+   * 
+   * // UNSAFE: user input - DO NOT DO THIS!
+   * // await shard.eval(userMessage); // RCE vulnerability!
    */
   async eval<T>(script: string | ((client: any) => T)): Promise<T> {
+    // Security: Log eval usage for audit purposes
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(`[Shard ${this.id}] eval() called - ensure this is not from user input`);
+    }
+    
     const _eval = typeof script === 'function' ? `(${script})(this)` : script;
     
     return new Promise((resolve, reject) => {
@@ -160,7 +196,12 @@ export class Shard extends EventEmitter {
         this.process?.off('message', handler);
         
         if (message._error) {
-          reject(new Error(message._error));
+          // Preserve stack trace from the shard process if available
+          const error = new Error(message._error);
+          if (message._errorStack) {
+            error.stack = message._errorStack;
+          }
+          reject(error);
         } else {
           resolve(message._result);
         }
@@ -310,11 +351,36 @@ export class ShardingManager extends EventEmitter {
 
   /**
    * Fetch recommended shard count from API
+   * Calls the /gateway/bot endpoint to get the recommended shard count
    */
   async fetchRecommendedShards(): Promise<number> {
-    // In a real implementation, this would call the API
-    // For now, return a default
-    return 1;
+    if (!this.token) {
+      console.warn('[ShardingManager] No token set, returning default shard count of 1');
+      return 1;
+    }
+    
+    try {
+      // Call the gateway/bot endpoint to get recommended shards
+      const response = await fetch('https://gateway.jubbio.com/api/v1/gateway/bot', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bot ${this.token}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'JubbioBot/1.0 (+https://jubbio.com)'
+        }
+      });
+      
+      if (!response.ok) {
+        console.warn(`[ShardingManager] Failed to fetch recommended shards: ${response.status}, using default of 1`);
+        return 1;
+      }
+      
+      const data = await response.json() as { shards?: number };
+      return data.shards ?? 1;
+    } catch (error) {
+      console.warn('[ShardingManager] Error fetching recommended shards, using default of 1:', error);
+      return 1;
+    }
   }
 
   /**
@@ -408,7 +474,12 @@ export class ShardClientUtil {
         process.off('message', handler);
         
         if (message._error) {
-          reject(new Error(message._error));
+          // Preserve stack trace from the shard process if available
+          const error = new Error(message._error);
+          if (message._errorStack) {
+            error.stack = message._errorStack;
+          }
+          reject(error);
         } else {
           resolve(message._results);
         }

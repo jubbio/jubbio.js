@@ -62,6 +62,38 @@ export class BaseChannel {
   }
 
   /**
+   * Check if this is a category channel
+   */
+  isCategory(): boolean {
+    return this.type === ChannelType.GuildCategory;
+  }
+
+  /**
+   * Check if this is a forum channel
+   */
+  isForum(): boolean {
+    return this.type === ChannelType.GuildForum;
+  }
+
+  /**
+   * Check if this is a thread channel
+   */
+  isThread(): boolean {
+    return [
+      ChannelType.PublicThread,
+      ChannelType.PrivateThread,
+      ChannelType.AnnouncementThread
+    ].includes(this.type);
+  }
+
+  /**
+   * Check if this is an announcement channel
+   */
+  isAnnouncement(): boolean {
+    return this.type === ChannelType.GuildAnnouncement;
+  }
+
+  /**
    * Convert to string (mention format)
    */
   toString(): string {
@@ -99,16 +131,36 @@ export class TextChannel extends BaseChannel {
 
   /**
    * Send a message to this channel
+   * ponytail: Bug #8 fix - embed tekil kullanımı, Bug #10 fix - flags desteği
    */
   async send(options: string | MessageCreateOptions): Promise<Message> {
     const content = typeof options === 'string' ? options : options.content;
-    const embeds = typeof options === 'string' ? undefined : resolveEmbeds(options.embeds);
+    // ponytail: Bug #8 fix - embed tekil kullanımı desteklenir
+    const rawEmbeds = typeof options === 'string' 
+      ? undefined 
+      : (options.embeds || (options.embed ? [options.embed] : undefined));
+    const embeds = resolveEmbeds(rawEmbeds);
     const components = typeof options === 'string' ? undefined : options.components;
+    const files = typeof options === 'string' ? undefined : options.files;
+    const flags = typeof options === 'string' ? undefined : options.flags;
+    
+    // Dosya varsa createMessageWithFile kullan
+    if (files && files.length > 0 && this.guildId) {
+      const file = files[0]; // Şimdilik tek dosya desteği
+      const data = await this.client.rest.createMessageWithFile(this.guildId, this.id, {
+        content,
+        embeds,
+        components,
+        file
+      });
+      return new Message(this.client, data);
+    }
     
     const data = await this.client.rest.createMessage(this.guildId || '', this.id, {
       content,
       embeds,
       components,
+      flags,
     });
     
     return new Message(this.client, data);
@@ -215,6 +267,10 @@ export class VoiceChannel extends BaseChannel {
 
   /**
    * Check if the bot can join this voice channel
+   * Returns false if:
+   * - Missing guild or user reference
+   * - Bot lacks Connect permission
+   * - Channel is at user limit capacity
    */
   get joinable(): boolean {
     if (!this.guildId || !this.client.user) return false;
@@ -222,7 +278,15 @@ export class VoiceChannel extends BaseChannel {
     if (!guild) return false;
     const me = guild.members.get(String(this.client.user.id));
     if (!me) return true; // No cached member — optimistic, server will reject if not allowed
-    return me.permissions.has('Connect');
+    if (!me.permissions.has('Connect')) return false;
+    
+    // Check user limit (0 = unlimited)
+    if (this.userLimit && this.userLimit > 0) {
+      const membersInChannel = guild.members.filter(m => m.voice?.channelId === this.id).size;
+      if (membersInChannel >= this.userLimit) return false;
+    }
+    
+    return true;
   }
 }
 
@@ -260,8 +324,10 @@ export class DMChannel extends BaseChannel {
 export interface MessageCreateOptions {
   content?: string;
   embeds?: (APIEmbed | EmbedBuilder)[];
+  embed?: APIEmbed | EmbedBuilder;  // ponytail: Bug #8 - tekil embed desteği
   components?: any[];
   files?: any[];
+  flags?: number;  // ponytail: Bug #10 - flags desteği (MessageFlags.SuppressEmbeds vb.)
 }
 
 /**

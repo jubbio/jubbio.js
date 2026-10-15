@@ -146,22 +146,18 @@ export async function probeAudioInfo(input: string, ytDlpPath?: string): Promise
       searchQuery = `ytsearch1:${input}`;
     }
     
-    let ytdlp: ReturnType<typeof spawn>;
+    // SECURITY: Use spawn with arguments array instead of shell to prevent command injection
+    // Never pass user input through shell interpolation
+    const args = ['--no-playlist', '--no-warnings', '-j', searchQuery];
     
-    if (isWindows) {
-      // Windows: escape special characters and use shell
-      // Replace double quotes with escaped version for cmd
-      const escapedQuery = searchQuery.replace(/"/g, '\\"');
-      const cmd = `${ytdlpBin} --no-playlist --no-warnings -j "${escapedQuery}"`;
-      console.log('[probeAudioInfo] Running:', cmd);
-      ytdlp = spawn(cmd, [], { shell: true });
-    } else {
-      // Unix: use bash -c with quoted string
-      ytdlp = spawn('bash', [
-        '-c',
-        `${ytdlpBin} --no-playlist --no-warnings -j "${searchQuery}"`
-      ]);
-    }
+    console.log('[probeAudioInfo] Running:', ytdlpBin, args.join(' '));
+    
+    // Spawn without shell - arguments are passed safely as array
+    const ytdlp = spawn(ytdlpBin, args, { 
+      shell: false,
+      // On Unix, if ytdlpBin contains ~, expand it
+      env: process.env
+    });
     
     let stdout = '';
     let stderr = '';

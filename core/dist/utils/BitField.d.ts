@@ -9,6 +9,10 @@ export type BitFieldResolvable<S extends string, N extends bigint | number> = N 
 export declare class BitField<S extends string = string, N extends bigint | number = bigint> {
     /** The raw bits */
     bitfield: N;
+    /** Cached array result */
+    private _cachedArray;
+    /** Bitfield value at the time of caching */
+    private _bitfieldAtCache;
     /** Flags for this bitfield (override in subclass) */
     static Flags: Record<string, bigint | number>;
     /** Default bit value */

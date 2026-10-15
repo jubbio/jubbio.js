@@ -5,8 +5,10 @@ export declare class Collection<K, V> extends Map<K, V> {
     /**
      * Identical to Map.get()
      * Ensures the value exists
+     * @param key The key to get
+     * @param defaultValue The default value or a generator function (key, collection) => V
      */
-    ensure(key: K, defaultValueGenerator: (key: K, collection: this) => V): V;
+    ensure(key: K, defaultValue: V | ((key: K, collection: this) => V)): V;
     /**
      * Checks if all items pass a test
      */

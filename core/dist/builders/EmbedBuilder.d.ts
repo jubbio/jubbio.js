@@ -37,12 +37,61 @@ export interface APIEmbed {
     author?: APIEmbedAuthor;
     fields?: APIEmbedField[];
 }
+/** Global defaults for all embeds */
+interface EmbedDefaults {
+    footer?: {
+        text: string;
+        iconURL?: string;
+    };
+    color?: number;
+    autoTimestamp?: boolean;
+}
 /**
  * A builder for creating embeds
  */
 export declare class EmbedBuilder {
     readonly data: APIEmbed;
     constructor(data?: APIEmbed);
+    /**
+     * Set global defaults for all new embeds
+     * @example
+     * EmbedBuilder.setDefaults({
+     *   footer: { text: 'Powered by MyBot' },
+     *   color: 0x5865f2,
+     *   autoTimestamp: true
+     * });
+     */
+    static setDefaults(defaults: EmbedDefaults): void;
+    /**
+     * Clear all global defaults
+     */
+    static clearDefaults(): void;
+    /**
+     * Get current global defaults
+     */
+    static getDefaults(): Readonly<EmbedDefaults>;
+    /**
+     * Get the total character count of this embed
+     * Useful for checking against the 6000 char limit before sending
+     */
+    get length(): number;
+    /**
+     * Get all validation errors for this embed
+     * Useful for checking validity without throwing
+     * @returns Array of error messages (empty if valid)
+     */
+    getValidationErrors(): string[];
+    /**
+     * Validate this embed against Discord/Jubbio limits
+     * @throws {RangeError} if any limit is exceeded
+     * @returns this (for chaining)
+     */
+    validate(): this;
+    /**
+     * Check if this embed is valid (non-throwing version)
+     * @returns true if valid, false otherwise
+     */
+    isValid(): boolean;
     /**
      * Sets the title of this embed
      * @param title The title
@@ -65,9 +114,9 @@ export declare class EmbedBuilder {
     setTimestamp(timestamp?: Date | number | null): this;
     /**
      * Sets the color of this embed
-     * @param color The color (number, hex string, or RGB array)
+     * @param color The color (number, hex string, color name, 'Random', or RGB array)
      */
-    setColor(color: number | `#${string}` | [number, number, number] | null): this;
+    setColor(color: number | string | [number, number, number] | null): this;
     /**
      * Sets the footer of this embed
      * @param options The footer options
@@ -78,14 +127,22 @@ export declare class EmbedBuilder {
     } | null): this;
     /**
      * Sets the image of this embed
-     * @param url The image URL
+     * @param options The image URL string or options object with url, height, width
      */
-    setImage(url: string | null): this;
+    setImage(options: string | {
+        url: string;
+        height?: number;
+        width?: number;
+    } | null): this;
     /**
      * Sets the thumbnail of this embed
-     * @param url The thumbnail URL
+     * @param options The thumbnail URL string or options object with url, height, width
      */
-    setThumbnail(url: string | null): this;
+    setThumbnail(options: string | {
+        url: string;
+        height?: number;
+        width?: number;
+    } | null): this;
     /**
      * Sets the author of this embed
      * @param options The author options
@@ -113,7 +170,12 @@ export declare class EmbedBuilder {
      */
     spliceFields(index: number, deleteCount: number, ...fields: APIEmbedField[]): this;
     /**
+     * Clears all fields from this embed
+     */
+    clearFields(): this;
+    /**
      * Returns the JSON representation of this embed
+     * ponytail: Bug #7 fix - fields deep copy yapılır
      */
     toJSON(): APIEmbed;
     /**
@@ -122,7 +184,7 @@ export declare class EmbedBuilder {
      */
     static from(other: APIEmbed | EmbedBuilder): EmbedBuilder;
 }
-export declare const Colors: {
+export declare const Colors: Readonly<{
     readonly Default: 0;
     readonly White: 16777215;
     readonly Aqua: 1752220;
@@ -153,5 +215,5 @@ export declare const Colors: {
     readonly Greyple: 10070709;
     readonly DarkButNotBlack: 2895667;
     readonly NotQuiteBlack: 2303786;
-};
+}>;
 export default EmbedBuilder;

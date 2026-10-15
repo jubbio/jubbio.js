@@ -12,7 +12,7 @@ import {
   APIUser
 } from './types';
 import { GatewayOpcodes, GatewayIntentBits } from './enums';
-import { Collection } from './structures/Collection';
+import { Collection } from './utils/Collection';
 import { User } from './structures/User';
 import { Guild } from './structures/Guild';
 import { Message } from './structures/Message';
@@ -106,6 +106,9 @@ export class Client extends EventEmitter {
   /** Maximum reconnect attempts before giving up */
   private readonly _maxReconnectAttempts: number = 5;
 
+  /** Cached intents value */
+  private _intentsValue?: number;
+
   constructor(options: ClientOptions) {
     super();
     this.options = options;
@@ -122,10 +125,33 @@ export class Client extends EventEmitter {
    * Calculate intents value
    */
   private getIntentsValue(): number {
-    if (typeof this.options.intents === 'number') {
-      return this.options.intents;
+    // Cache the intents value for checkIntent() lookups
+    if (this._intentsValue !== undefined) {
+      return this._intentsValue;
     }
-    return this.options.intents.reduce((acc, intent) => acc | intent, 0);
+    if (typeof this.options.intents === 'number') {
+      this._intentsValue = this.options.intents;
+    } else {
+      this._intentsValue = this.options.intents.reduce((acc, intent) => acc | intent, 0);
+    }
+    return this._intentsValue;
+  }
+
+  /**
+   * Check if a specific intent is enabled. Emits a 'warn' event if the intent
+   * is not enabled, allowing library consumers to catch misconfiguration early.
+   * 
+   * @param intent - The GatewayIntentBits flag to check
+   * @param feature - Human-readable description of the feature requiring this intent
+   * @returns true if the intent is enabled, false otherwise
+   */
+  private checkIntent(intent: GatewayIntentBits, feature: string): boolean {
+    const intents = this.getIntentsValue();
+    const hasIntent = (intents & intent) === intent;
+    if (!hasIntent) {
+      this.emit('warn', `Missing intent for ${feature}. Enable GatewayIntentBits.${GatewayIntentBits[intent]} to use this feature.`);
+    }
+    return hasIntent;
   }
 
   /**
@@ -382,6 +408,14 @@ export class Client extends EventEmitter {
         this.emit('messageDeleteBulk', data);
         break;
         
+      case 'MESSAGE_REACTION_ADD':
+        this.emit('messageReactionAdd', data);
+        break;
+        
+      case 'MESSAGE_REACTION_REMOVE':
+        this.emit('messageReactionRemove', data);
+        break;
+        
       case 'CHANNEL_CREATE': {
         // Update guild channel cache
         const guildId = data.guild_id;
@@ -492,13 +526,31 @@ export class Client extends EventEmitter {
         this.emit('inviteDelete', data);
         break;
         
+      case 'CHANNEL_PINS_UPDATE':
+        this.emit('channelPinsUpdate', data);
+        break;
+        
       case 'TYPING_START':
         this.emit('typingStart', data);
         break;
         
-      case 'PRESENCE_UPDATE':
+      case 'PRESENCE_UPDATE': {
+        // ponytail: update guild onlineCount based on status change
+        const guildId = data.guild_id;
+        const status = data.status;
+        if (guildId) {
+          const guild = this.guilds.get(String(guildId));
+          if (guild) {
+            if (status === 'offline') {
+              guild.onlineCount = Math.max(0, guild.onlineCount - 1);
+            } else if (status === 'online' || status === 'idle' || status === 'dnd') {
+              guild.onlineCount++;
+            }
+          }
+        }
         this.emit('presenceUpdate', data);
         break;
+      }
         
       case 'INTERACTION_CREATE':
         this.handleInteractionCreate(data);
@@ -546,7 +598,7 @@ export class Client extends EventEmitter {
     // Setup voice adapters for each guild
     this.setupVoiceAdapters();
     
-    console.log(`✅ Bot hazır! User: ${this.user.username} (${this.user.id}), App: ${this.applicationId}`);
+    this.emit('debug', `Bot ready! User: ${this.user.username} (${this.user.id}), App: ${this.applicationId}`);
     this.emit('ready', this);
 
     // Signal shard manager that this shard is ready (if running as a shard)
@@ -686,19 +738,27 @@ export class Client extends EventEmitter {
    * Handle Interaction Create event
    */
   private handleInteractionCreate(data: APIInteraction): void {
-    console.log('[DEBUG] handleInteractionCreate called with:', JSON.stringify(data, null, 2));
-    
-    // Cache the user
-    const userData = data.member?.user || data.user;
-    if (userData) {
-      const user = new User(userData);
-      this.users.set(user.id, user);
-      this.rest.cacheUser(userData);
+    if (process.env.DEBUG_CLIENT) {
+      console.log('[DEBUG] handleInteractionCreate called with:', JSON.stringify(data, null, 2));
     }
     
-    const interaction = createInteraction(this, data);
-    console.log('[DEBUG] Created interaction type:', interaction.constructor.name, 'customId:', (interaction as any).customId);
-    this.emit('interactionCreate', interaction);
+    try {
+      // Cache the user
+      const userData = data.member?.user || data.user;
+      if (userData) {
+        const user = new User(userData);
+        this.users.set(user.id, user);
+        this.rest.cacheUser(userData);
+      }
+      
+      const interaction = createInteraction(this, data);
+      if (process.env.DEBUG_CLIENT) {
+        console.log('[DEBUG] Created interaction type:', interaction.constructor.name, 'customId:', (interaction as any).customId);
+      }
+      this.emit('interactionCreate', interaction);
+    } catch (err) {
+      console.error('[ERROR] handleInteractionCreate crashed:', err);
+    }
   }
 
   /**

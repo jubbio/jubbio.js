@@ -206,4 +206,201 @@ export class StringSelectMenuOptionBuilder {
 // Alias for DJS compatibility
 export { StringSelectMenuBuilder as SelectMenuBuilder };
 
+/**
+ * Component types for select menus
+ */
+export enum SelectMenuType {
+  String = 3,
+  User = 5,
+  Role = 6,
+  Mentionable = 7,
+  Channel = 8,
+}
+
+/**
+ * Base interface for auto-populated select menus (User, Role, Mentionable, Channel)
+ */
+interface APIAutoSelectMenuComponent {
+  type: number;
+  custom_id: string;
+  placeholder?: string;
+  min_values?: number;
+  max_values?: number;
+  disabled?: boolean;
+  /** Channel types to include (only for ChannelSelectMenu) */
+  channel_types?: number[];
+}
+
+/**
+ * A builder for creating user select menus
+ * Users are auto-populated from the guild
+ */
+export class UserSelectMenuBuilder {
+  public readonly data: Partial<APIAutoSelectMenuComponent>;
+
+  constructor(data: Partial<APIAutoSelectMenuComponent> = {}) {
+    this.data = { type: SelectMenuType.User, ...data };
+  }
+
+  setCustomId(customId: string): this {
+    this.data.custom_id = customId;
+    return this;
+  }
+
+  setPlaceholder(placeholder: string): this {
+    this.data.placeholder = placeholder;
+    return this;
+  }
+
+  setMinValues(minValues: number): this {
+    this.data.min_values = minValues;
+    return this;
+  }
+
+  setMaxValues(maxValues: number): this {
+    this.data.max_values = maxValues;
+    return this;
+  }
+
+  setDisabled(disabled = true): this {
+    this.data.disabled = disabled;
+    return this;
+  }
+
+  toJSON(): APIAutoSelectMenuComponent {
+    return { ...this.data } as APIAutoSelectMenuComponent;
+  }
+}
+
+/**
+ * A builder for creating role select menus
+ * Roles are auto-populated from the guild
+ */
+export class RoleSelectMenuBuilder {
+  public readonly data: Partial<APIAutoSelectMenuComponent>;
+
+  constructor(data: Partial<APIAutoSelectMenuComponent> = {}) {
+    this.data = { type: SelectMenuType.Role, ...data };
+  }
+
+  setCustomId(customId: string): this {
+    this.data.custom_id = customId;
+    return this;
+  }
+
+  setPlaceholder(placeholder: string): this {
+    this.data.placeholder = placeholder;
+    return this;
+  }
+
+  setMinValues(minValues: number): this {
+    this.data.min_values = minValues;
+    return this;
+  }
+
+  setMaxValues(maxValues: number): this {
+    this.data.max_values = maxValues;
+    return this;
+  }
+
+  setDisabled(disabled = true): this {
+    this.data.disabled = disabled;
+    return this;
+  }
+
+  toJSON(): APIAutoSelectMenuComponent {
+    return { ...this.data } as APIAutoSelectMenuComponent;
+  }
+}
+
+/**
+ * A builder for creating mentionable select menus (users + roles)
+ */
+export class MentionableSelectMenuBuilder {
+  public readonly data: Partial<APIAutoSelectMenuComponent>;
+
+  constructor(data: Partial<APIAutoSelectMenuComponent> = {}) {
+    this.data = { type: SelectMenuType.Mentionable, ...data };
+  }
+
+  setCustomId(customId: string): this {
+    this.data.custom_id = customId;
+    return this;
+  }
+
+  setPlaceholder(placeholder: string): this {
+    this.data.placeholder = placeholder;
+    return this;
+  }
+
+  setMinValues(minValues: number): this {
+    this.data.min_values = minValues;
+    return this;
+  }
+
+  setMaxValues(maxValues: number): this {
+    this.data.max_values = maxValues;
+    return this;
+  }
+
+  setDisabled(disabled = true): this {
+    this.data.disabled = disabled;
+    return this;
+  }
+
+  toJSON(): APIAutoSelectMenuComponent {
+    return { ...this.data } as APIAutoSelectMenuComponent;
+  }
+}
+
+/**
+ * A builder for creating channel select menus
+ * Channels are auto-populated from the guild
+ */
+export class ChannelSelectMenuBuilder {
+  public readonly data: Partial<APIAutoSelectMenuComponent>;
+
+  constructor(data: Partial<APIAutoSelectMenuComponent> = {}) {
+    this.data = { type: SelectMenuType.Channel, ...data };
+  }
+
+  setCustomId(customId: string): this {
+    this.data.custom_id = customId;
+    return this;
+  }
+
+  setPlaceholder(placeholder: string): this {
+    this.data.placeholder = placeholder;
+    return this;
+  }
+
+  setMinValues(minValues: number): this {
+    this.data.min_values = minValues;
+    return this;
+  }
+
+  setMaxValues(maxValues: number): this {
+    this.data.max_values = maxValues;
+    return this;
+  }
+
+  setDisabled(disabled = true): this {
+    this.data.disabled = disabled;
+    return this;
+  }
+
+  /**
+   * Sets the channel types that can be selected
+   * @param types Array of ChannelType values
+   */
+  setChannelTypes(types: number[]): this {
+    this.data.channel_types = types;
+    return this;
+  }
+
+  toJSON(): APIAutoSelectMenuComponent {
+    return { ...this.data } as APIAutoSelectMenuComponent;
+  }
+}
+
 export default StringSelectMenuBuilder;

@@ -1,5 +1,23 @@
 /**
  * ShardingManager - Multi-process bot support
+ *
+ * SECURITY WARNING: This module contains eval() functionality for cross-shard communication.
+ * The eval() method executes arbitrary code and should NEVER be exposed to external users.
+ *
+ * Safe usage:
+ * - Only call eval() with code you wrote yourself
+ * - Never pass user input to eval()
+ * - Never expose eval() through commands or APIs
+ *
+ * Example of UNSAFE code (DO NOT DO THIS):
+ * ```js
+ * // DANGEROUS - user can execute arbitrary code!
+ * client.on('messageCreate', (msg) => {
+ *   if (msg.content.startsWith('!eval')) {
+ *     shard.eval(msg.content.slice(6)); // RCE VULNERABILITY!
+ *   }
+ * });
+ * ```
  */
 import { EventEmitter } from 'events';
 import { ChildProcess } from 'child_process';
@@ -74,6 +92,19 @@ export declare class Shard extends EventEmitter {
     send(message: any): Promise<void>;
     /**
      * Evaluate code on the shard
+     *
+     * ⚠️ SECURITY WARNING: This method executes arbitrary code on the shard process.
+     * NEVER pass user input to this method - it will result in Remote Code Execution (RCE).
+     *
+     * @param script - Code to evaluate (string or function)
+     * @returns Promise resolving to the evaluation result
+     *
+     * @example
+     * // Safe: hardcoded code
+     * const guildCount = await shard.eval(client => client.guilds.cache.size);
+     *
+     * // UNSAFE: user input - DO NOT DO THIS!
+     * // await shard.eval(userMessage); // RCE vulnerability!
      */
     eval<T>(script: string | ((client: any) => T)): Promise<T>;
     /**
@@ -121,6 +152,7 @@ export declare class ShardingManager extends EventEmitter {
     createShard(id: number): Shard;
     /**
      * Fetch recommended shard count from API
+     * Calls the /gateway/bot endpoint to get the recommended shard count
      */
     fetchRecommendedShards(): Promise<number>;
     /**
