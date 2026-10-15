@@ -19,6 +19,8 @@
     "strictPropertyInitialization": false,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
     "outDir": "./dist",
     "rootDir": "./src"
   },

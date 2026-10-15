@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 import { ClientOptions } from './types';
 import { GatewayIntentBits } from './enums';
-import { Collection } from './structures/Collection';
+import { Collection } from './utils/Collection';
 import { User } from './structures/User';
 import { Guild } from './structures/Guild';
 import { BaseChannel } from './structures/Channel';
@@ -70,11 +70,22 @@ export declare class Client extends EventEmitter {
     private _reconnectAttempts;
     /** Maximum reconnect attempts before giving up */
     private readonly _maxReconnectAttempts;
+    /** Cached intents value */
+    private _intentsValue?;
     constructor(options: ClientOptions);
     /**
      * Calculate intents value
      */
     private getIntentsValue;
+    /**
+     * Check if a specific intent is enabled. Emits a 'warn' event if the intent
+     * is not enabled, allowing library consumers to catch misconfiguration early.
+     *
+     * @param intent - The GatewayIntentBits flag to check
+     * @param feature - Human-readable description of the feature requiring this intent
+     * @returns true if the intent is enabled, false otherwise
+     */
+    private checkIntent;
     /**
      * Gateway close code descriptions
      */

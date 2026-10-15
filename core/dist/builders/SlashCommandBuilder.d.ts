@@ -123,6 +123,91 @@ export declare class SlashCommandAttachmentOption extends SlashCommandOptionBuil
     constructor();
 }
 /**
+ * A builder for slash command subcommands
+ * Supports the same option methods as SlashCommandBuilder (except subcommands/subcommand groups)
+ */
+export declare class SlashCommandSubcommandBuilder {
+    readonly data: Partial<APIApplicationCommandOption>;
+    constructor();
+    /**
+     * Sets the name of this subcommand
+     * @param name The name
+     */
+    setName(name: string): this;
+    /**
+     * Sets the description of this subcommand
+     * @param description The description
+     */
+    setDescription(description: string): this;
+    /**
+     * Adds a string option
+     */
+    addStringOption(fn: (option: SlashCommandStringOption) => SlashCommandStringOption): this;
+    /**
+     * Adds an integer option
+     */
+    addIntegerOption(fn: (option: SlashCommandIntegerOption) => SlashCommandIntegerOption): this;
+    /**
+     * Adds a number option
+     */
+    addNumberOption(fn: (option: SlashCommandNumberOption) => SlashCommandNumberOption): this;
+    /**
+     * Adds a boolean option
+     */
+    addBooleanOption(fn: (option: SlashCommandBooleanOption) => SlashCommandBooleanOption): this;
+    /**
+     * Adds a user option
+     */
+    addUserOption(fn: (option: SlashCommandUserOption) => SlashCommandUserOption): this;
+    /**
+     * Adds a channel option
+     */
+    addChannelOption(fn: (option: SlashCommandChannelOption) => SlashCommandChannelOption): this;
+    /**
+     * Adds a role option
+     */
+    addRoleOption(fn: (option: SlashCommandRoleOption) => SlashCommandRoleOption): this;
+    /**
+     * Adds a mentionable option
+     */
+    addMentionableOption(fn: (option: SlashCommandMentionableOption) => SlashCommandMentionableOption): this;
+    /**
+     * Adds an attachment option
+     */
+    addAttachmentOption(fn: (option: SlashCommandAttachmentOption) => SlashCommandAttachmentOption): this;
+    /**
+     * Returns the JSON representation of this subcommand
+     */
+    toJSON(): APIApplicationCommandOption;
+}
+/**
+ * A builder for slash command subcommand groups
+ * Can contain subcommands but not options directly
+ */
+export declare class SlashCommandSubcommandGroupBuilder {
+    readonly data: Partial<APIApplicationCommandOption>;
+    constructor();
+    /**
+     * Sets the name of this subcommand group
+     * @param name The name
+     */
+    setName(name: string): this;
+    /**
+     * Sets the description of this subcommand group
+     * @param description The description
+     */
+    setDescription(description: string): this;
+    /**
+     * Adds a subcommand to this group
+     * @param fn Function that configures the subcommand
+     */
+    addSubcommand(fn: (sub: SlashCommandSubcommandBuilder) => SlashCommandSubcommandBuilder): this;
+    /**
+     * Returns the JSON representation of this subcommand group
+     */
+    toJSON(): APIApplicationCommandOption;
+}
+/**
  * A builder for creating slash commands
  */
 export declare class SlashCommandBuilder {
@@ -189,6 +274,16 @@ export declare class SlashCommandBuilder {
      * Adds an attachment option
      */
     addAttachmentOption(fn: (option: SlashCommandAttachmentOption) => SlashCommandAttachmentOption): this;
+    /**
+     * Adds a subcommand to this command
+     * @param fn Function that configures the subcommand
+     */
+    addSubcommand(fn: (sub: SlashCommandSubcommandBuilder) => SlashCommandSubcommandBuilder): this;
+    /**
+     * Adds a subcommand group to this command
+     * @param fn Function that configures the subcommand group
+     */
+    addSubcommandGroup(fn: (group: SlashCommandSubcommandGroupBuilder) => SlashCommandSubcommandGroupBuilder): this;
     /**
      * Returns the JSON representation of this command
      */

@@ -23,6 +23,9 @@ export class PermissionsBitField {
   /** The raw bits */
   public bitfield: bigint;
 
+  /** Whether this represents a guild owner (owners have all permissions) */
+  private isOwner: boolean;
+
   /** All permission flags */
   static Flags = PermissionFlagsBits;
 
@@ -32,14 +35,20 @@ export class PermissionsBitField {
   /** Default permissions */
   static Default = BigInt(0);
 
-  constructor(bits: PermissionResolvable = 0n) {
+  constructor(bits: PermissionResolvable = 0n, isOwner = false) {
     this.bitfield = PermissionsBitField.resolve(bits);
+    this.isOwner = isOwner;
   }
 
   /**
    * Check if this bitfield has a permission
    */
   has(permission: PermissionResolvable, checkAdmin = true): boolean {
+    // Owner has all permissions
+    if (this.isOwner) {
+      return true;
+    }
+
     // Admin has all permissions
     if (checkAdmin && this.bitfield & PermissionFlagsBits.Administrator) {
       return true;
@@ -53,6 +62,11 @@ export class PermissionsBitField {
    * Check if this bitfield has any of the permissions
    */
   any(permissions: PermissionResolvable, checkAdmin = true): boolean {
+    // Owner has all permissions
+    if (this.isOwner) {
+      return true;
+    }
+
     // Admin has all permissions
     if (checkAdmin && this.bitfield & PermissionFlagsBits.Administrator) {
       return true;
@@ -68,8 +82,10 @@ export class PermissionsBitField {
   missing(permissions: PermissionResolvable, checkAdmin = true): PermissionString[] {
     const missing: PermissionString[] = [];
     
+    // Resolve once outside the loop (MEDIUM-9 fix)
+    const resolved = PermissionsBitField.resolve(permissions);
+    
     for (const [name, bit] of Object.entries(PermissionFlagsBits)) {
-      const resolved = PermissionsBitField.resolve(permissions);
       if ((resolved & bit) && !this.has(bit, checkAdmin)) {
         missing.push(name as PermissionString);
       }
@@ -145,7 +161,7 @@ export class PermissionsBitField {
    * Create a new bitfield with the same bits
    */
   clone(): PermissionsBitField {
-    return new PermissionsBitField(this.bitfield);
+    return new PermissionsBitField(this.bitfield, this.isOwner);
   }
 
   /**

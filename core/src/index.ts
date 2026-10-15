@@ -9,16 +9,22 @@ export * from './enums';
 
 // REST
 export { REST, type MentionsData, type MentionUser, type MentionRole } from './rest/REST';
+export { RESTError, RateLimitError } from './rest/errors';
 
 // Structures
 export { Collection } from './structures/Collection';
-export { User } from './structures/User';
+export { User, type DMMessageOptions } from './structures/User';
 export { Guild } from './structures/Guild';
-export { GuildMember, Permissions, PermissionFlags } from './structures/GuildMember';
+export { GuildMember } from './structures/GuildMember';
+// Backward compatibility: export PermissionsBitField as Permissions
+export { PermissionsBitField as Permissions } from './utils/PermissionsBitField';
+// Backward compatibility: export PermissionFlagsBits as PermissionFlags
+export { PermissionFlagsBits as PermissionFlags } from './enums';
 
 // Managers
 export { ApplicationCommandManager } from './managers/ApplicationCommandManager';
-export { Message, type MessageMentions } from './structures/Message';
+export { Message, MessageReaction, ReactionEmoji, type MessageMentions } from './structures/Message';
+export { Embed } from './structures/Embed';
 export { 
   Interaction, 
   CommandInteraction, 
@@ -77,6 +83,11 @@ export {
   StringSelectMenuBuilder, 
   SelectMenuBuilder,
   StringSelectMenuOptionBuilder,
+  UserSelectMenuBuilder,
+  RoleSelectMenuBuilder,
+  MentionableSelectMenuBuilder,
+  ChannelSelectMenuBuilder,
+  SelectMenuType,
   type APISelectMenuOption,
   type APISelectMenuComponent,
 } from './builders/SelectMenuBuilder';
@@ -107,6 +118,8 @@ export {
   SlashCommandRoleOption,
   SlashCommandMentionableOption,
   SlashCommandAttachmentOption,
+  SlashCommandSubcommandBuilder,
+  SlashCommandSubcommandGroupBuilder,
   ApplicationCommandOptionType as SlashCommandOptionType,
 } from './builders/SlashCommandBuilder';
 
@@ -142,6 +155,15 @@ export {
   type PermissionString, 
   type PermissionResolvable 
 } from './utils/PermissionsBitField';
+
+// Utils - Emoji
+export {
+  unicodeToShortcode,
+  normalizeEmoji,
+  isUnicodeEmoji,
+  isShortcode,
+  isCustomEmoji,
+} from './utils/emojiUtils';
 
 // Sharding
 export {

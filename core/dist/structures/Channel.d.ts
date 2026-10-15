@@ -32,6 +32,22 @@ export declare class BaseChannel {
      */
     isVoiceBased(): this is VoiceChannel;
     /**
+     * Check if this is a category channel
+     */
+    isCategory(): boolean;
+    /**
+     * Check if this is a forum channel
+     */
+    isForum(): boolean;
+    /**
+     * Check if this is a thread channel
+     */
+    isThread(): boolean;
+    /**
+     * Check if this is an announcement channel
+     */
+    isAnnouncement(): boolean;
+    /**
      * Convert to string (mention format)
      */
     toString(): string;
@@ -53,6 +69,7 @@ export declare class TextChannel extends BaseChannel {
     constructor(client: Client, data: APIChannel);
     /**
      * Send a message to this channel
+     * ponytail: Bug #8 fix - embed tekil kullanımı, Bug #10 fix - flags desteği
      */
     send(options: string | MessageCreateOptions): Promise<Message>;
     /**
@@ -90,6 +107,10 @@ export declare class VoiceChannel extends BaseChannel {
     });
     /**
      * Check if the bot can join this voice channel
+     * Returns false if:
+     * - Missing guild or user reference
+     * - Bot lacks Connect permission
+     * - Channel is at user limit capacity
      */
     get joinable(): boolean;
 }
@@ -113,8 +134,10 @@ export declare class DMChannel extends BaseChannel {
 export interface MessageCreateOptions {
     content?: string;
     embeds?: (APIEmbed | EmbedBuilder)[];
+    embed?: APIEmbed | EmbedBuilder;
     components?: any[];
     files?: any[];
+    flags?: number;
 }
 /**
  * Create appropriate channel class based on type

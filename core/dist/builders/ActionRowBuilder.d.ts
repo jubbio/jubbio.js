@@ -18,8 +18,19 @@ export declare class ActionRowBuilder<T extends APIActionRowComponent = APIActio
     };
     constructor(data?: Partial<APIActionRow>);
     /**
+     * Get the existing component type in the row (button vs select menu)
+     * @returns 'button' | 'select' | null
+     */
+    private _getExistingComponentCategory;
+    /**
+     * Validate that a component is compatible with existing components in the row
+     * @throws {Error} if component type is incompatible
+     */
+    private _validateComponentType;
+    /**
      * Adds components to this action row
      * Accepts individual components or an array of components
+     * @throws {Error} if component types are incompatible (buttons cannot mix with select menus)
      */
     addComponents(...components: (T | {
         toJSON(): T;

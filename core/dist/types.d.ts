@@ -1,5 +1,9 @@
 import { GatewayIntentBits, InteractionType, ApplicationCommandType, ChannelType } from './enums';
 /**
+ * Snowflake type alias for Discord-style string IDs
+ */
+export type Snowflake = string;
+/**
  * Client options
  */
 export interface ClientOptions {
@@ -14,9 +18,10 @@ export interface ClientOptions {
 }
 /**
  * User structure
+ * Note: Backend may return id as number, SDK normalizes to string
  */
 export interface APIUser {
-    id: string;
+    id: string | number;
     username: string;
     display_name?: string;
     avatar_url?: string;
@@ -31,6 +36,7 @@ export interface APIGuild {
     icon?: string;
     owner_id: string;
     member_count?: number;
+    online_count?: number;
     unavailable?: boolean;
     channels?: APIChannel[];
 }
@@ -38,6 +44,8 @@ export interface APIGuild {
  * Channel structure
  */
 export interface APIChannel {
+    app_installation_id?: string;
+    app_version?: string;
     id: string;
     type: ChannelType;
     guild_id?: string;
@@ -45,6 +53,10 @@ export interface APIChannel {
     topic?: string;
     position?: number;
     parent_id?: string;
+    /** Slowmode delay in seconds */
+    slowmode_seconds?: number;
+    /** User limit for voice channels (0 = unlimited) */
+    user_limit?: number;
 }
 /**
  * Message structure
@@ -60,6 +72,14 @@ export interface APIMessage {
     edited_timestamp?: string;
     attachments?: APIAttachment[];
     embeds?: APIEmbed[];
+    /** Webhook ID if message was sent via webhook */
+    webhook_id?: string;
+    /** Application ID for bot messages (needed for component interactions) */
+    application_id?: string;
+    /** Nonce for message deduplication */
+    nonce?: string;
+    /** Forwarded message info */
+    forwarded_from?: APIForwardedFrom;
 }
 /**
  * Attachment structure
@@ -254,4 +274,174 @@ export interface ReadyEventData {
     application: {
         id: string;
     };
+}
+/**
+ * API response for guild data (fresh from API, not cached)
+ */
+export interface APIGuildData {
+    id: string;
+    name: string;
+    icon?: string;
+    owner_id: string;
+    member_count?: number;
+    online_count?: number;
+}
+/**
+ * API response for ban data
+ */
+export interface APIBan {
+    user: APIUser;
+    reason?: string;
+}
+/**
+ * API response for invite data
+ */
+export interface APIInvite {
+    code: string;
+    channel_id?: string;
+    guild_id?: string;
+    uses?: number;
+    max_uses?: number;
+    max_age?: number;
+    temporary?: boolean;
+    inviter?: APIUser;
+}
+/**
+ * API response for member data (extends APIGuildMember)
+ */
+export interface APIMemberData extends APIGuildMember {
+}
+/**
+ * API response for role data (extends APIRole)
+ */
+export interface APIRoleData extends APIRole {
+}
+/**
+ * API response for emoji data
+ */
+export interface APIEmoji {
+    id: string;
+    name: string;
+    animated?: boolean;
+    available?: boolean;
+    roles?: string[];
+    user?: APIUser;
+    require_colons?: boolean;
+    managed?: boolean;
+}
+/**
+ * API response for webhook data
+ */
+export interface APIWebhook {
+    id: string;
+    type: number;
+    guild_id?: string;
+    channel_id?: string;
+    user?: APIUser;
+    name?: string;
+    avatar_url?: string;
+    token?: string;
+    url?: string;
+}
+/**
+ * Component types for REST methods
+ */
+export type AnyComponent = {
+    type: number;
+    [key: string]: unknown;
+};
+/**
+ * Action row component type
+ */
+export type AnyActionRow = {
+    type: 1;
+    components: AnyComponent[];
+};
+/**
+ * Paginated response with members
+ */
+export interface APIMembersResponse {
+    members: APIMemberData[];
+    page_info: {
+        cursor?: string;
+        has_more?: boolean;
+    };
+}
+/**
+ * Forwarded message information
+ */
+export interface APIForwardedFrom {
+    message_id: string;
+    channel_id: string;
+    guild_id?: string;
+    author?: APIUser;
+}
+/**
+ * Audit log entry
+ */
+export interface APIAuditLogEntry {
+    id: string;
+    action_type: number;
+    user_id?: string;
+    target_id?: string;
+    changes?: Array<{
+        key: string;
+        old_value?: unknown;
+        new_value?: unknown;
+    }>;
+    options?: Record<string, unknown>;
+    reason?: string;
+}
+/**
+ * Audit log response
+ */
+export interface APIAuditLog {
+    audit_log_entries: APIAuditLogEntry[];
+    users?: APIUser[];
+}
+/**
+ * Reaction add event data from gateway
+ * Emitted when a user adds a reaction to a message
+ */
+export interface APIReactionAddEvent {
+    /** The message ID that was reacted to */
+    message_id: string;
+    /** The user ID who added the reaction */
+    user_id: number | string;
+    /** The emoji used (unicode, :name:, or <:name:id>) */
+    emoji: string;
+    /** The channel ID containing the message */
+    channel_id: string;
+    /** The guild ID (if in a guild) */
+    guild_id?: string;
+}
+/**
+ * Reaction remove event data from gateway
+ * Emitted when a user removes a reaction from a message
+ */
+export interface APIReactionRemoveEvent {
+    /** The message ID that had the reaction removed */
+    message_id: string;
+    /** The user ID who removed the reaction */
+    user_id: number | string;
+    /** The emoji that was removed */
+    emoji: string;
+    /** The channel ID containing the message */
+    channel_id: string;
+    /** The guild ID (if in a guild) */
+    guild_id?: string;
+}
+/**
+ * Reaction remove all event data from gateway
+ * Emitted when all reactions are removed from a message
+ */
+export interface APIReactionRemoveAllEvent {
+    /** The message ID that had all reactions removed */
+    message_id: string;
+    /** The channel ID containing the message */
+    channel_id: string;
+    /** The guild ID (if in a guild) */
+    guild_id?: string;
+    /** Optional: specific emoji if only one emoji's reactions were removed */
+    emoji?: string;
 }

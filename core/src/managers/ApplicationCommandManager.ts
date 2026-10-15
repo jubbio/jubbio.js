@@ -1,4 +1,4 @@
-import { Collection } from '../structures/Collection';
+import { Collection } from '../utils/Collection';
 import { REST } from '../rest/REST';
 import type { APIApplicationCommand } from '../types';
 

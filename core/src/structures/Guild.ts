@@ -26,6 +26,9 @@ export class Guild {
   /** Member count */
   public memberCount: number;
   
+  /** Online member count */
+  public onlineCount: number;
+  
   /** Whether the guild is unavailable */
   public unavailable: boolean;
   
@@ -45,6 +48,7 @@ export class Guild {
     this.icon = data.icon;
     this.ownerId = data.owner_id;
     this.memberCount = data.member_count ?? 0;
+    this.onlineCount = data.online_count ?? 0;
     this.unavailable = data.unavailable ?? false;
     this.members = new Collection();
     this.channels = new Collection();
@@ -116,6 +120,24 @@ export class Guild {
   }
 
   /**
+   * Fetch fresh guild data from API (updates cache)
+   * Returns real-time memberCount and onlineCount from live data
+   * @param options Optional fetch options
+   * @param options.withMembers Whether to also fetch and cache members (not yet implemented)
+   * @param options.withRoles Whether to also fetch roles (not yet implemented, structure placeholder)
+   */
+  async fetch(options?: { withMembers?: boolean; withRoles?: boolean }): Promise<this> {
+    const data = await this.client.rest.getGuild(this.id);
+    this._patch(data);
+    
+    // Note: withRoles and withMembers are placeholders for future implementation
+    // Role caching and member bulk fetching would be implemented here
+    // Currently, roles would need a separate API endpoint: this.client.rest.getRoles(this.id)
+    
+    return this;
+  }
+
+  /**
    * Update guild data
    */
   _patch(data: Partial<APIGuild>): void {
@@ -123,6 +145,7 @@ export class Guild {
     if (data.icon !== undefined) this.icon = data.icon;
     if (data.owner_id !== undefined) this.ownerId = data.owner_id;
     if (data.member_count !== undefined) this.memberCount = data.member_count;
+    if (data.online_count !== undefined) this.onlineCount = data.online_count;
     if (data.unavailable !== undefined) this.unavailable = data.unavailable;
     if (data.channels) {
       for (const channel of data.channels) {

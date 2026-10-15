@@ -1,5 +1,9 @@
 /**
  * Data resolver utilities for handling various data types
+ *
+ * SECURITY NOTE: This module handles file operations. Path traversal protection
+ * is implemented to prevent reading files outside allowed directories.
+ * Bot developers should set allowed directories via DataResolver.setAllowedPaths()
  */
 export type BufferResolvable = Buffer | string;
 export type Base64Resolvable = Buffer | string;
@@ -7,9 +11,24 @@ export type Base64Resolvable = Buffer | string;
  * Resolves various data types to usable formats
  */
 export declare class DataResolver {
+    /** Allowed directories for file operations (empty = allow all for backwards compatibility) */
+    private static allowedPaths;
+    /**
+     * Set allowed directories for file operations (security hardening)
+     * @param paths Array of allowed base directories
+     * @example
+     * // Only allow files from assets and uploads directories
+     * DataResolver.setAllowedPaths(['./assets', './uploads']);
+     */
+    static setAllowedPaths(paths: string[]): void;
+    /**
+     * Get currently allowed paths
+     */
+    static getAllowedPaths(): string[];
     /**
      * Resolves a BufferResolvable to a Buffer
      * @param resource The resource to resolve
+     * @throws Error if path traversal is detected (when allowedPaths is configured)
      */
     static resolveBuffer(resource: BufferResolvable): Promise<Buffer>;
     /**

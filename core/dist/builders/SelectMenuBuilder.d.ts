@@ -120,4 +120,87 @@ export declare class StringSelectMenuOptionBuilder {
     toJSON(): APISelectMenuOption;
 }
 export { StringSelectMenuBuilder as SelectMenuBuilder };
+/**
+ * Component types for select menus
+ */
+export declare enum SelectMenuType {
+    String = 3,
+    User = 5,
+    Role = 6,
+    Mentionable = 7,
+    Channel = 8
+}
+/**
+ * Base interface for auto-populated select menus (User, Role, Mentionable, Channel)
+ */
+interface APIAutoSelectMenuComponent {
+    type: number;
+    custom_id: string;
+    placeholder?: string;
+    min_values?: number;
+    max_values?: number;
+    disabled?: boolean;
+    /** Channel types to include (only for ChannelSelectMenu) */
+    channel_types?: number[];
+}
+/**
+ * A builder for creating user select menus
+ * Users are auto-populated from the guild
+ */
+export declare class UserSelectMenuBuilder {
+    readonly data: Partial<APIAutoSelectMenuComponent>;
+    constructor(data?: Partial<APIAutoSelectMenuComponent>);
+    setCustomId(customId: string): this;
+    setPlaceholder(placeholder: string): this;
+    setMinValues(minValues: number): this;
+    setMaxValues(maxValues: number): this;
+    setDisabled(disabled?: boolean): this;
+    toJSON(): APIAutoSelectMenuComponent;
+}
+/**
+ * A builder for creating role select menus
+ * Roles are auto-populated from the guild
+ */
+export declare class RoleSelectMenuBuilder {
+    readonly data: Partial<APIAutoSelectMenuComponent>;
+    constructor(data?: Partial<APIAutoSelectMenuComponent>);
+    setCustomId(customId: string): this;
+    setPlaceholder(placeholder: string): this;
+    setMinValues(minValues: number): this;
+    setMaxValues(maxValues: number): this;
+    setDisabled(disabled?: boolean): this;
+    toJSON(): APIAutoSelectMenuComponent;
+}
+/**
+ * A builder for creating mentionable select menus (users + roles)
+ */
+export declare class MentionableSelectMenuBuilder {
+    readonly data: Partial<APIAutoSelectMenuComponent>;
+    constructor(data?: Partial<APIAutoSelectMenuComponent>);
+    setCustomId(customId: string): this;
+    setPlaceholder(placeholder: string): this;
+    setMinValues(minValues: number): this;
+    setMaxValues(maxValues: number): this;
+    setDisabled(disabled?: boolean): this;
+    toJSON(): APIAutoSelectMenuComponent;
+}
+/**
+ * A builder for creating channel select menus
+ * Channels are auto-populated from the guild
+ */
+export declare class ChannelSelectMenuBuilder {
+    readonly data: Partial<APIAutoSelectMenuComponent>;
+    constructor(data?: Partial<APIAutoSelectMenuComponent>);
+    setCustomId(customId: string): this;
+    setPlaceholder(placeholder: string): this;
+    setMinValues(minValues: number): this;
+    setMaxValues(maxValues: number): this;
+    setDisabled(disabled?: boolean): this;
+    /**
+     * Sets the channel types that can be selected
+     * @param types Array of ChannelType values
+     */
+    setChannelTypes(types: number[]): this;
+    toJSON(): APIAutoSelectMenuComponent;
+}
 export default StringSelectMenuBuilder;

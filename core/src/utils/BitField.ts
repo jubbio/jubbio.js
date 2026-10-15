@@ -17,6 +17,12 @@ export class BitField<S extends string = string, N extends bigint | number = big
   /** The raw bits */
   public bitfield: N;
 
+  /** Cached array result */
+  private _cachedArray: S[] | null = null;
+  
+  /** Bitfield value at the time of caching */
+  private _bitfieldAtCache: N | null = null;
+
   /** Flags for this bitfield (override in subclass) */
   static Flags: Record<string, bigint | number> = {};
 
@@ -52,6 +58,9 @@ export class BitField<S extends string = string, N extends bigint | number = big
       total |= (this.constructor as typeof BitField).resolve<S, N>(bit) as bigint;
     }
     (this.bitfield as bigint) |= total;
+    // Invalidate cache
+    this._cachedArray = null;
+    this._bitfieldAtCache = null;
     return this;
   }
 
@@ -64,6 +73,9 @@ export class BitField<S extends string = string, N extends bigint | number = big
       total |= (this.constructor as typeof BitField).resolve<S, N>(bit) as bigint;
     }
     (this.bitfield as bigint) &= ~total;
+    // Invalidate cache
+    this._cachedArray = null;
+    this._bitfieldAtCache = null;
     return this;
   }
 
@@ -71,6 +83,11 @@ export class BitField<S extends string = string, N extends bigint | number = big
    * Serialize to array of flag names
    */
   toArray(): S[] {
+    // Return cached result if bitfield hasn't changed
+    if (this._cachedArray !== null && this._bitfieldAtCache === this.bitfield) {
+      return [...this._cachedArray];
+    }
+    
     const flags = (this.constructor as typeof BitField).Flags;
     const result: S[] = [];
     
@@ -80,7 +97,11 @@ export class BitField<S extends string = string, N extends bigint | number = big
       }
     }
     
-    return result;
+    // Cache the result
+    this._cachedArray = result;
+    this._bitfieldAtCache = this.bitfield;
+    
+    return [...result];
   }
 
   /**

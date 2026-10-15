@@ -19,6 +19,8 @@ export declare class Guild {
     ownerId: string;
     /** Member count */
     memberCount: number;
+    /** Online member count */
+    onlineCount: number;
     /** Whether the guild is unavailable */
     unavailable: boolean;
     /** Cached members */
@@ -63,6 +65,17 @@ export declare class Guild {
      * Convert to string
      */
     toString(): string;
+    /**
+     * Fetch fresh guild data from API (updates cache)
+     * Returns real-time memberCount and onlineCount from live data
+     * @param options Optional fetch options
+     * @param options.withMembers Whether to also fetch and cache members (not yet implemented)
+     * @param options.withRoles Whether to also fetch roles (not yet implemented, structure placeholder)
+     */
+    fetch(options?: {
+        withMembers?: boolean;
+        withRoles?: boolean;
+    }): Promise<this>;
     /**
      * Update guild data
      */

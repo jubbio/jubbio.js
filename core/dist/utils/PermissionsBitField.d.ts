@@ -14,6 +14,8 @@ export type PermissionResolvable = bigint | bigint[] | PermissionString | Permis
 export declare class PermissionsBitField {
     /** The raw bits */
     bitfield: bigint;
+    /** Whether this represents a guild owner (owners have all permissions) */
+    private isOwner;
     /** All permission flags */
     static Flags: {
         readonly CreateInstantInvite: bigint;
@@ -65,7 +67,7 @@ export declare class PermissionsBitField {
     static All: bigint;
     /** Default permissions */
     static Default: bigint;
-    constructor(bits?: PermissionResolvable);
+    constructor(bits?: PermissionResolvable, isOwner?: boolean);
     /**
      * Check if this bitfield has a permission
      */

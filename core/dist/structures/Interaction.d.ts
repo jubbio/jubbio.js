@@ -3,6 +3,7 @@ import { InteractionType } from '../enums';
 import { User } from './User';
 import { GuildMember } from './GuildMember';
 import { EmbedBuilder } from '../builders/EmbedBuilder';
+import { Message } from './Message';
 import type { Client } from '../Client';
 /**
  * Base interaction class
@@ -103,15 +104,20 @@ export declare class CommandInteraction extends Interaction {
  * Command interaction options helper
  */
 export declare class CommandInteractionOptions {
+    private client;
     private options;
     private resolved?;
-    /** Patterns that indicate code injection attempts */
-    private static readonly DANGEROUS_PATTERNS;
-    /** Sanitize a string value by rejecting dangerous patterns */
-    private static sanitize;
-    constructor(options: APIInteractionOption[], resolved?: APIInteractionResolved);
+    constructor(client: Client, options: APIInteractionOption[], resolved?: APIInteractionResolved);
     /**
-     * Get a string option (sanitized against code injection)
+     * Get a string option value.
+     *
+     * **Warning:** Returns raw user input without any sanitization.
+     * The caller is responsible for validating and safely handling this value
+     * before using it in database queries, shell commands, or other sensitive contexts.
+     *
+     * @param name - The name of the option to retrieve
+     * @param required - If true, throws an error when the option is not found
+     * @returns The raw string value, or null if not found (and not required)
      */
     getString(name: string, required?: boolean): string | null;
     /**
@@ -174,12 +180,12 @@ export declare class ButtonInteraction extends Interaction {
     /** Component type (always 2 for buttons) */
     readonly componentType: number;
     /** Message the button is attached to */
-    readonly message?: any;
+    readonly message?: Message;
     constructor(client: Client, data: APIInteraction);
     /**
      * Update the message the button is attached to
      */
-    update(options: InteractionReplyOptions): Promise<void>;
+    update(options: string | InteractionReplyOptions): Promise<void>;
     /**
      * Show a modal in response to this button interaction
      */
@@ -198,12 +204,12 @@ export declare class SelectMenuInteraction extends Interaction {
     /** Selected values */
     readonly values: string[];
     /** Message the select menu is attached to */
-    readonly message?: any;
+    readonly message?: Message;
     constructor(client: Client, data: APIInteraction);
     /**
      * Update the message the select menu is attached to
      */
-    update(options: InteractionReplyOptions): Promise<void>;
+    update(options: string | InteractionReplyOptions): Promise<void>;
     /**
      * Show a modal in response to this select menu interaction
      */

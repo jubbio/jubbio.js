@@ -4,26 +4,9 @@ import { User } from './User';
 import { GuildMember } from './GuildMember';
 import { Collection } from './Collection';
 import { EmbedBuilder } from '../builders/EmbedBuilder';
+import { Message } from './Message';
 import type { Client } from '../Client';
-
-/**
- * Serialize components array (ActionRowBuilder/ButtonBuilder instances) to plain JSON.
- * Handles nested structures: ActionRow → components[] → Button/SelectMenu
- */
-function serializeComponents(components: any[] | undefined): any[] | undefined {
-  if (!components) return undefined;
-  return components.map(row => {
-    // If it has a toJSON method (ActionRowBuilder), call it
-    const rowData = typeof row?.toJSON === 'function' ? row.toJSON() : row;
-    // Also serialize nested components (buttons, select menus inside action rows)
-    if (rowData?.components && Array.isArray(rowData.components)) {
-      rowData.components = rowData.components.map((comp: any) =>
-        typeof comp?.toJSON === 'function' ? comp.toJSON() : comp
-      );
-    }
-    return rowData;
-  });
-}
+import { serializeComponents } from '../utils/serialize';
 
 /**
  * Base interaction class
@@ -74,7 +57,7 @@ export class Interaction {
     
     // User can come from member.user or directly from user
     const userData = data.member?.user || data.user;
-    this.user = userData ? new User(userData) : new User({ id: '0', username: 'Unknown' });
+    this.user = userData ? new User(userData, client) : new User({ id: '0', username: 'Unknown' }, client);
     
     // Create member if in guild
     if (data.member && this.guildId) {
@@ -230,15 +213,24 @@ export class Interaction {
   async followUp(options: string | InteractionReplyOptions): Promise<void> {
     const content = typeof options === 'string' ? options : options.content;
     const rawEmbeds = typeof options === 'string' ? undefined : options.embeds;
+    const rawComponents = typeof options === 'string' ? undefined : options.components;
     const ephemeral = typeof options === 'string' ? false : options.ephemeral;
+    const files = typeof options === 'string' ? undefined : options.files;
     
     // Convert EmbedBuilder instances to plain objects
     const embeds = rawEmbeds?.map(e => e instanceof EmbedBuilder ? e.toJSON() : e);
     
+    // Convert component builder instances to plain objects
+    const components = rawComponents?.map((c: any) =>
+      typeof c.toJSON === 'function' ? c.toJSON() : c
+    );
+    
     await this.client.rest.createFollowup(this.token, {
       content,
       embeds,
-      flags: ephemeral ? MessageFlags.Ephemeral : 0
+      components,
+      flags: ephemeral ? MessageFlags.Ephemeral : 0,
+      files
     });
   }
 }
@@ -256,7 +248,7 @@ export class CommandInteraction extends Interaction {
   constructor(client: Client, data: APIInteraction) {
     super(client, data);
     this.commandName = data.data?.name || '';
-    this.options = new CommandInteractionOptions(data.data?.options || [], data.data?.resolved);
+    this.options = new CommandInteractionOptions(client, data.data?.options || [], data.data?.resolved);
   }
 
   /**
@@ -275,42 +267,31 @@ export class CommandInteraction extends Interaction {
  * Command interaction options helper
  */
 export class CommandInteractionOptions {
+  private client: Client;
   private options: APIInteractionOption[];
   private resolved?: APIInteractionResolved;
 
-  /** Patterns that indicate code injection attempts */
-  private static readonly DANGEROUS_PATTERNS = [
-    'require(', 'import(', 'child_process', 'eval(', 'Function(',
-    'exec(', 'spawn(', 'execSync(', 'spawnSync(', '__proto__',
-    'constructor[', 'process.env', 'process.exit',
-    'fs.read', 'fs.write', 'fs.unlink',
-    'os.exec', 'os.system', 'subprocess', 'Runtime.getRuntime',
-  ];
-
-  /** Sanitize a string value by rejecting dangerous patterns */
-  private static sanitize(value: string): string {
-    const lower = value.toLowerCase();
-    for (const pattern of CommandInteractionOptions.DANGEROUS_PATTERNS) {
-      if (lower.includes(pattern.toLowerCase())) {
-        return '';
-      }
-    }
-    return value;
-  }
-
-  constructor(options: APIInteractionOption[], resolved?: APIInteractionResolved) {
+  constructor(client: Client, options: APIInteractionOption[], resolved?: APIInteractionResolved) {
+    this.client = client;
     this.options = options;
     this.resolved = resolved;
   }
 
   /**
-   * Get a string option (sanitized against code injection)
+   * Get a string option value.
+   * 
+   * **Warning:** Returns raw user input without any sanitization.
+   * The caller is responsible for validating and safely handling this value
+   * before using it in database queries, shell commands, or other sensitive contexts.
+   * 
+   * @param name - The name of the option to retrieve
+   * @param required - If true, throws an error when the option is not found
+   * @returns The raw string value, or null if not found (and not required)
    */
   getString(name: string, required?: boolean): string | null {
     const option = this.options.find(o => o.name === name);
     if (!option && required) throw new Error(`Required option "${name}" not found`);
-    const raw = option?.value as string || null;
-    return raw ? CommandInteractionOptions.sanitize(raw) : null;
+    return (option?.value as string) ?? null;
   }
 
   /**
@@ -355,12 +336,12 @@ export class CommandInteractionOptions {
 
     // Try to resolve from resolved data
     if (this.resolved?.users && this.resolved.users[userId]) {
-      return new User(this.resolved.users[userId]);
+      return new User(this.resolved.users[userId], this.client);
     }
 
     // Fallback: return a minimal User with just the ID
     if (userId && /^\d+$/.test(userId)) {
-      return new User({ id: userId, username: `User_${userId}` });
+      return new User({ id: userId, username: `User_${userId}` }, this.client);
     }
 
     return null;
@@ -420,7 +401,7 @@ export class AutocompleteInteraction extends Interaction {
   constructor(client: Client, data: APIInteraction) {
     super(client, data);
     this.commandName = data.data?.name || '';
-    this.options = new CommandInteractionOptions(data.data?.options || [], data.data?.resolved);
+    this.options = new CommandInteractionOptions(client, data.data?.options || [], data.data?.resolved);
   }
 
   /**
@@ -445,27 +426,37 @@ export class ButtonInteraction extends Interaction {
   public readonly componentType: number = 2;
   
   /** Message the button is attached to */
-  public readonly message?: any;
+  public readonly message?: Message;
 
   constructor(client: Client, data: APIInteraction) {
     super(client, data);
     this.customId = data.data?.custom_id || '';
-    this.message = data.message;
+    // ponytail: wrap in Message structure so .delete()/.edit() work
+    // Inject guild_id from interaction since backend sends minimal message payload
+    if (data.message) {
+      const messageData = { ...data.message, guild_id: data.guild_id };
+      this.message = new Message(client, messageData as any);
+    }
   }
 
   /**
    * Update the message the button is attached to
    */
-  async update(options: InteractionReplyOptions): Promise<void> {
+  async update(options: string | InteractionReplyOptions): Promise<void> {
+    // ponytail: Bug #13 fix - string parametre desteği
+    const content = typeof options === 'string' ? options : options.content;
+    const rawEmbeds = typeof options === 'string' ? undefined : options.embeds;
+    const rawComponents = typeof options === 'string' ? undefined : options.components;
+    
     // Convert EmbedBuilder instances to plain objects
-    const embeds = options.embeds?.map(e => e instanceof EmbedBuilder ? e.toJSON() : e);
+    const embeds = rawEmbeds?.map(e => e instanceof EmbedBuilder ? e.toJSON() : e);
     // Convert ActionRowBuilder/ButtonBuilder instances to plain objects
-    const components = serializeComponents(options.components);
+    const components = serializeComponents(rawComponents);
     
     await this.client.rest.createInteractionResponse(this.id, this.token, {
       type: InteractionResponseType.UpdateMessage,
       data: {
-        content: options.content,
+        content,
         embeds,
         components
       }
@@ -499,28 +490,38 @@ export class SelectMenuInteraction extends Interaction {
   public readonly values: string[];
   
   /** Message the select menu is attached to */
-  public readonly message?: any;
+  public readonly message?: Message;
 
   constructor(client: Client, data: APIInteraction) {
     super(client, data);
     this.customId = data.data?.custom_id || '';
     this.values = data.data?.values || [];
-    this.message = data.message;
+    // ponytail: wrap in Message structure so .delete()/.edit() work
+    // Inject guild_id from interaction since backend sends minimal message payload
+    if (data.message) {
+      const messageData = { ...data.message, guild_id: data.guild_id };
+      this.message = new Message(client, messageData as any);
+    }
   }
 
   /**
    * Update the message the select menu is attached to
    */
-  async update(options: InteractionReplyOptions): Promise<void> {
+  async update(options: string | InteractionReplyOptions): Promise<void> {
+    // ponytail: Bug #13 fix - string parametre desteği
+    const content = typeof options === 'string' ? options : options.content;
+    const rawEmbeds = typeof options === 'string' ? undefined : options.embeds;
+    const rawComponents = typeof options === 'string' ? undefined : options.components;
+    
     // Convert EmbedBuilder instances to plain objects
-    const embeds = options.embeds?.map(e => e instanceof EmbedBuilder ? e.toJSON() : e);
+    const embeds = rawEmbeds?.map(e => e instanceof EmbedBuilder ? e.toJSON() : e);
     // Convert ActionRowBuilder/ButtonBuilder instances to plain objects
-    const components = serializeComponents(options.components);
+    const components = serializeComponents(rawComponents);
     
     await this.client.rest.createInteractionResponse(this.id, this.token, {
       type: InteractionResponseType.UpdateMessage,
       data: {
-        content: options.content,
+        content,
         embeds,
         components
       }

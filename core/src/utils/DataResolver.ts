@@ -1,45 +1,102 @@
 /**
  * Data resolver utilities for handling various data types
+ * 
+ * SECURITY NOTE: This module handles file operations. Path traversal protection
+ * is implemented to prevent reading files outside allowed directories.
+ * Bot developers should set allowed directories via DataResolver.setAllowedPaths()
  */
 
 import { readFile } from 'fs/promises';
-import { basename } from 'path';
+import { basename, resolve, normalize, isAbsolute } from 'path';
 
 export type BufferResolvable = Buffer | string;
 export type Base64Resolvable = Buffer | string;
 
 /**
+ * Validates that a path doesn't escape allowed directories (path traversal protection)
+ * @param filePath The path to validate
+ * @param allowedPaths Array of allowed base directories (if empty, all paths are allowed for backwards compatibility)
+ * @throws Error if path traversal is detected
+ */
+function validatePath(filePath: string, allowedPaths: string[]): string {
+  // Normalize and resolve the path to prevent ../ attacks
+  const normalizedPath = normalize(resolve(filePath));
+  
+  // If no allowed paths configured, allow all (backwards compatibility)
+  // Bot developers should configure allowed paths for security
+  if (allowedPaths.length === 0) {
+    return normalizedPath;
+  }
+  
+  // Check if the normalized path starts with any allowed directory
+  const isAllowed = allowedPaths.some(allowedDir => {
+    const normalizedAllowed = normalize(resolve(allowedDir));
+    return normalizedPath.startsWith(normalizedAllowed);
+  });
+  
+  if (!isAllowed) {
+    throw new Error(`Path traversal detected: "${filePath}" is outside allowed directories`);
+  }
+  
+  return normalizedPath;
+}
+
+/**
  * Resolves various data types to usable formats
  */
 export class DataResolver {
+  /** Allowed directories for file operations (empty = allow all for backwards compatibility) */
+  private static allowedPaths: string[] = [];
+  
+  /**
+   * Set allowed directories for file operations (security hardening)
+   * @param paths Array of allowed base directories
+   * @example
+   * // Only allow files from assets and uploads directories
+   * DataResolver.setAllowedPaths(['./assets', './uploads']);
+   */
+  static setAllowedPaths(paths: string[]): void {
+    this.allowedPaths = paths.map(p => normalize(resolve(p)));
+  }
+  
+  /**
+   * Get currently allowed paths
+   */
+  static getAllowedPaths(): string[] {
+    return [...this.allowedPaths];
+  }
+
   /**
    * Resolves a BufferResolvable to a Buffer
    * @param resource The resource to resolve
+   * @throws Error if path traversal is detected (when allowedPaths is configured)
    */
   static async resolveBuffer(resource: BufferResolvable): Promise<Buffer> {
     if (Buffer.isBuffer(resource)) return resource;
     
     if (typeof resource === 'string') {
-      // Check if it's a file path
-      if (resource.startsWith('/') || resource.startsWith('./') || resource.startsWith('../') || /^[a-zA-Z]:/.test(resource)) {
-        return readFile(resource);
-      }
-      
-      // Check if it's a URL
+      // Check if it's a URL first (URLs don't need path validation)
       if (resource.startsWith('http://') || resource.startsWith('https://')) {
         const response = await fetch(resource);
         const arrayBuffer = await response.arrayBuffer();
         return Buffer.from(arrayBuffer);
       }
       
-      // Check if it's base64
+      // Check if it's base64 data URI
       if (resource.startsWith('data:')) {
         const base64Data = resource.split(',')[1];
         return Buffer.from(base64Data, 'base64');
       }
       
-      // Assume it's a file path
-      return readFile(resource);
+      // File path - validate for path traversal
+      if (resource.startsWith('/') || resource.startsWith('./') || resource.startsWith('../') || /^[a-zA-Z]:/.test(resource)) {
+        const safePath = validatePath(resource, this.allowedPaths);
+        return readFile(safePath);
+      }
+      
+      // Assume it's a relative file path
+      const safePath = validatePath(resource, this.allowedPaths);
+      return readFile(safePath);
     }
     
     throw new TypeError('Invalid resource type');
