@@ -53,6 +53,26 @@ interface CachedUser {
 const SENSITIVE_FIELDS = ['token', 'authorization', 'password', 'secret', 'api_key', 'apikey', 'api-key'];
 
 /**
+ * Regex to validate IDs in URL paths.
+ * IDs should only contain digits to prevent path traversal attacks.
+ */
+const VALID_ID_PATTERN = /^\d+$/;
+
+/**
+ * Validate that an ID is safe to use in URL paths.
+ * Prevents path traversal attacks like '../' in IDs.
+ * @throws Error if ID is invalid
+ */
+function validateId(id: string, fieldName: string): void {
+  if (!id || typeof id !== 'string') {
+    throw new Error(`Invalid ${fieldName}: must be a non-empty string`);
+  }
+  if (!VALID_ID_PATTERN.test(id)) {
+    throw new Error(`Invalid ${fieldName}: must contain only digits, got "${id.substring(0, 20)}${id.length > 20 ? '...' : ''}"`);
+  }
+}
+
+/**
  * REST API client for Jubbio
  */
 export class REST {
@@ -420,6 +440,11 @@ export class REST {
       // Yeni format: createMessage(guildId, channelId, data)
       guildId = guildIdOrChannelId;
       channelId = channelIdOrData;
+      
+      // SECURITY: Validate IDs to prevent path traversal
+      validateId(guildId, 'guildId');
+      validateId(channelId, 'channelId');
+      
       messageData = this.prepareMessageData(data);
       
       // Add interaction_id if provided
@@ -457,6 +482,11 @@ export class REST {
     embeds?: APIEmbed[];
     components?: any[];
   }): Promise<{ id: string; ephemeral: boolean; flags: number }> {
+    // SECURITY: Validate IDs to prevent path traversal
+    validateId(guildId, 'guildId');
+    validateId(channelId, 'channelId');
+    validateId(String(targetUserId), 'targetUserId');
+    
     const messageData = this.prepareMessageData(data);
     
     return this.request<{ id: string; ephemeral: boolean; flags: number }>('POST', `/bot/guilds/${guildId}/channels/${channelId}/messages`, {
@@ -569,6 +599,11 @@ export class REST {
     components?: any[];
     mentions?: MentionsData;
   }): Promise<APIMessage> {
+    // SECURITY: Validate IDs to prevent path traversal
+    validateId(guildId, 'guildId');
+    validateId(channelId, 'channelId');
+    validateId(messageId, 'messageId');
+    
     const path = `/bot/guilds/${guildId}/channels/${channelId}/messages/${messageId}`;
     const processedData = this.prepareMessageData(data);
     return this.request<APIMessage>('PATCH', path, processedData);
@@ -578,6 +613,11 @@ export class REST {
    * Delete a message
    */
   async deleteMessage(guildId: string, channelId: string, messageId: string): Promise<void> {
+    // SECURITY: Validate IDs to prevent path traversal
+    validateId(guildId, 'guildId');
+    validateId(channelId, 'channelId');
+    validateId(messageId, 'messageId');
+    
     const path = `/bot/guilds/${guildId}/channels/${channelId}/messages/${messageId}`;
     await this.request<void>('DELETE', path);
   }
@@ -611,6 +651,11 @@ export class REST {
    * await rest.addReaction(guildId, channelId, messageId, '<:custom:123456>');
    */
   async addReaction(guildId: string, channelId: string, messageId: string, emoji: string): Promise<void> {
+    // SECURITY: Validate IDs to prevent path traversal
+    validateId(guildId, 'guildId');
+    validateId(channelId, 'channelId');
+    validateId(messageId, 'messageId');
+    
     const validated = this.validateEmoji(emoji);
     const path = `/bot/guilds/${guildId}/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(validated)}/@me`;
     await this.request<void>('PUT', path);
@@ -621,6 +666,11 @@ export class REST {
    * @param emoji - Unicode emoji (👍), :name:, <:name:id>, or <a:name:id> format
    */
   async removeReaction(guildId: string, channelId: string, messageId: string, emoji: string): Promise<void> {
+    // SECURITY: Validate IDs to prevent path traversal
+    validateId(guildId, 'guildId');
+    validateId(channelId, 'channelId');
+    validateId(messageId, 'messageId');
+    
     const validated = this.validateEmoji(emoji);
     const path = `/bot/guilds/${guildId}/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(validated)}/@me`;
     await this.request<void>('DELETE', path);
@@ -1338,6 +1388,10 @@ export class REST {
    * ```
    */
   async getMember(guildId: string, userId: string): Promise<APIMemberData> {
+    // SECURITY: Validate IDs to prevent path traversal
+    validateId(guildId, 'guildId');
+    validateId(userId, 'userId');
+    
     return this.request<APIMemberData>('GET', `/bot/guilds/${guildId}/members/${userId}`);
   }
 
@@ -1486,6 +1540,10 @@ export class REST {
    * ```
    */
   async kickMember(guildId: string, userId: string, reason?: string): Promise<void> {
+    // SECURITY: Validate IDs to prevent path traversal
+    validateId(guildId, 'guildId');
+    validateId(userId, 'userId');
+    
     const query = reason ? `?reason=${encodeURIComponent(reason)}` : '';
     await this.request('DELETE', `/bot/guilds/${guildId}/members/${userId}${query}`);
   }
@@ -1517,6 +1575,10 @@ export class REST {
     deleteMessageSeconds?: number;
     reason?: string;
   }): Promise<void> {
+    // SECURITY: Validate IDs to prevent path traversal
+    validateId(guildId, 'guildId');
+    validateId(userId, 'userId');
+    
     await this.request('PUT', `/bot/guilds/${guildId}/bans/${userId}`, {
       delete_message_days: options?.deleteMessageDays,
       delete_message_seconds: options?.deleteMessageSeconds,
@@ -1598,6 +1660,9 @@ export class REST {
    * ```
    */
   async getGuild(guildId: string): Promise<APIGuildData> {
+    // SECURITY: Validate ID to prevent path traversal
+    validateId(guildId, 'guildId');
+    
     return this.request<APIGuildData>('GET', `/bot/guilds/${guildId}`);
   }
 

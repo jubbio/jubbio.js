@@ -9,10 +9,12 @@ import {
   TrackSource,
   AudioFrame 
 } from '@livekit/rtc-node';
+import os from 'os';
 import { AudioPlayerStatus } from './enums';
 import { CreateAudioPlayerOptions, AudioPlayerState } from './types';
 import { AudioResource } from './AudioResource';
 import { VoiceConnection } from './VoiceConnection';
+import path from 'path';
 
 // Audio settings for LiveKit (48kHz stereo)
 const SAMPLE_RATE = 48000;
@@ -26,6 +28,98 @@ const TARGET_BUFFER_FRAMES = 150; // ~3 seconds - target buffer size
 const MIN_BUFFER_FRAMES = 75;    // ~1.5 seconds - minimum before we start
 const MAX_BUFFER_FRAMES = 500;   // ~10 seconds - max buffer to prevent memory issues
 const LOW_BUFFER_THRESHOLD = 50; // ~1 second - when to slow down playback
+
+/**
+ * Allowed URL hosts for direct audio playback.
+ * Only these domains are permitted to prevent SSRF attacks.
+ */
+const ALLOWED_AUDIO_HOSTS = new Set([
+  'youtube.com',
+  'www.youtube.com',
+  'youtu.be',
+  'soundcloud.com',
+  'www.soundcloud.com',
+  'twitch.tv',
+  'www.twitch.tv',
+  'clips.twitch.tv',
+  // Add more allowed hosts as needed
+]);
+
+/**
+ * Private/internal IP ranges that should be blocked to prevent SSRF.
+ */
+function isPrivateIP(hostname: string): boolean {
+  // Check for localhost
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
+    return true;
+  }
+  
+  // Check for common private IP patterns
+  // IPv4 private ranges: 10.x.x.x, 172.16-31.x.x, 192.168.x.x
+  const ipv4PrivatePatterns = [
+    /^10\./,
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
+    /^192\.168\./,
+    /^127\./,
+    /^0\./,
+    /^169\.254\./, // Link-local
+  ];
+  
+  for (const pattern of ipv4PrivatePatterns) {
+    if (pattern.test(hostname)) {
+      return true;
+    }
+  }
+  
+  // IPv6 private patterns
+  if (hostname.startsWith('fe80:') || hostname.startsWith('fc') || hostname.startsWith('fd')) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Validate URL for audio playback security.
+ * Returns null if URL is invalid or blocked, otherwise returns the validated URL.
+ */
+function validateAudioUrl(url: string): { valid: boolean; reason?: string; hostname?: string } {
+  try {
+    const parsed = new URL(url);
+    
+    // Only allow http/https protocols
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return { valid: false, reason: `Protocol not allowed: ${parsed.protocol}` };
+    }
+    
+    const hostname = parsed.hostname.toLowerCase();
+    
+    // Block private/internal IPs
+    if (isPrivateIP(hostname)) {
+      return { valid: false, reason: `Private/internal IP blocked: ${hostname}` };
+    }
+    
+    return { valid: true, hostname };
+  } catch (e) {
+    return { valid: false, reason: `Invalid URL: ${(e as Error).message}` };
+  }
+}
+
+/**
+ * Check if a URL host is in the allowed list for direct yt-dlp/ffmpeg processing.
+ */
+function isAllowedAudioHost(hostname: string): boolean {
+  const normalizedHost = hostname.toLowerCase();
+  
+  // Check exact match or subdomain match
+  for (const allowed of ALLOWED_AUDIO_HOSTS) {
+    if (normalizedHost === allowed || normalizedHost.endsWith('.' + allowed)) {
+      return true;
+    }
+  }
+  
+  return false;
+}
 
 /**
  * Audio player for playing audio resources
@@ -45,6 +139,9 @@ export class AudioPlayer extends EventEmitter {
   
   /** FFmpeg process */
   private ffmpegProcess: ChildProcess | null = null;
+  
+  /** yt-dlp process - kept for proper cleanup */
+  private ytdlpProcess: ChildProcess | null = null;
   
   /** LiveKit audio source and track */
   private audioSource: AudioSource | null = null;
@@ -222,29 +319,52 @@ export class AudioPlayer extends EventEmitter {
       console.log(`Converted to YouTube search: ${inputSource}`);
     }
     
-    // Check if this is a streaming URL that needs yt-dlp
-    const needsYtDlp = inputSource.includes('youtube.com') || 
-                       inputSource.includes('youtu.be') ||
-                       inputSource.includes('soundcloud.com') ||
-                       inputSource.includes('twitch.tv') ||
-                       inputSource.startsWith('ytsearch');
+    // SECURITY: Validate URL to prevent SSRF attacks
+    let useYtDlp = false;
     
-    if (needsYtDlp) {
+    if (inputSource.startsWith('http://') || inputSource.startsWith('https://')) {
+      const validation = validateAudioUrl(inputSource);
+      if (!validation.valid) {
+        throw new Error(`URL validation failed: ${validation.reason}`);
+      }
+      
+      // Check if host is in allowed list for yt-dlp processing
+      if (validation.hostname && isAllowedAudioHost(validation.hostname)) {
+        useYtDlp = true;
+      } else {
+        // For non-allowed hosts, we block the request entirely for security
+        // Direct ffmpeg access to arbitrary URLs is a security risk (SSRF)
+        throw new Error(`Audio host not allowed: ${validation.hostname}. Only YouTube, SoundCloud, and Twitch are supported.`);
+      }
+    } else if (inputSource.startsWith('ytsearch')) {
+      // Search queries always go through yt-dlp
+      useYtDlp = true;
+    }
+    
+    if (useYtDlp) {
       // Use yt-dlp to pipe audio directly to FFmpeg
       console.log('Using yt-dlp pipe mode');
       
-      // Detect platform
-      const isWindows = process.platform === 'win32';
-      const ytDlpPath = isWindows ? 'yt-dlp' : '~/.local/bin/yt-dlp';
+      // SECURITY: Properly resolve yt-dlp path using os.homedir()
+      // On Windows, yt-dlp is typically in PATH
+      // On Linux/macOS, it may be in ~/.local/bin
+      let ytDlpPath: string;
+      if (process.platform === 'win32') {
+        ytDlpPath = 'yt-dlp';
+      } else {
+        // Use os.homedir() to properly expand ~
+        ytDlpPath = path.join(os.homedir(), '.local', 'bin', 'yt-dlp');
+      }
       
       // SECURITY: Use args array (no shell) to prevent command injection
-      // User input should never be passed through shell interpolation
+      // The '--' separator ensures inputSource is treated as a positional arg, not an option
       const ytdlpArgs = [
         '-f', 'bestaudio/best',
         '-o', '-',
         '--no-playlist',
         '--no-warnings',
         '--default-search', 'ytsearch',
+        '--', // SECURITY: Separator to prevent option injection
         inputSource
       ];
       
@@ -260,12 +380,12 @@ export class AudioPlayer extends EventEmitter {
       console.log('[AudioPlayer] yt-dlp args:', ytdlpArgs.join(' '));
       
       // Spawn yt-dlp without shell
-      const ytdlpProcess = spawn(ytDlpPath, ytdlpArgs, { 
+      this.ytdlpProcess = spawn(ytDlpPath, ytdlpArgs, { 
         stdio: ['pipe', 'pipe', 'pipe'],
         shell: false
       });
       
-      // Spawn ffmpeg without shell
+      // Spawn ffmpeg without shell, with protocol whitelist
       this.ffmpegProcess = spawn('ffmpeg', ffmpegArgs, { 
         stdio: ['pipe', 'pipe', 'pipe'],
         shell: false
@@ -274,7 +394,7 @@ export class AudioPlayer extends EventEmitter {
       // Track data flow
       let ytdlpDataReceived = 0;
       
-      ytdlpProcess.stdout?.on('data', (chunk: Buffer) => {
+      this.ytdlpProcess.stdout?.on('data', (chunk: Buffer) => {
         ytdlpDataReceived += chunk.length;
         if (ytdlpDataReceived < 10000 || ytdlpDataReceived % 100000 < 10000) {
           console.log(`[yt-dlp] stdout data: ${chunk.length} bytes (total: ${ytdlpDataReceived})`);
@@ -282,29 +402,34 @@ export class AudioPlayer extends EventEmitter {
       });
       
       // Pipe yt-dlp stdout to ffmpeg stdin
-      ytdlpProcess.stdout?.pipe(this.ffmpegProcess.stdin!);
+      this.ytdlpProcess.stdout?.pipe(this.ffmpegProcess.stdin!);
       
       // Handle yt-dlp stderr - log everything for debugging
-      ytdlpProcess.stderr?.on('data', (data: Buffer) => {
+      this.ytdlpProcess.stderr?.on('data', (data: Buffer) => {
         const msg = data.toString().trim();
         if (msg) {
           console.log('[yt-dlp]', msg);
         }
       });
       
-      ytdlpProcess.on('error', (err) => {
+      this.ytdlpProcess.on('error', (err) => {
         console.error('[yt-dlp] process error:', err.message);
       });
       
-      ytdlpProcess.on('close', (code) => {
+      this.ytdlpProcess.on('close', (code) => {
         console.log(`[yt-dlp] closed with code ${code}, total data: ${ytdlpDataReceived} bytes`);
+        this.ytdlpProcess = null;
       });
     } else {
+      // This branch should not be reached due to security checks above
+      // But kept for safety - direct FFmpeg mode with protocol whitelist
       console.log('Using direct FFmpeg mode');
       this.ffmpegProcess = spawn('ffmpeg', [
         '-reconnect', '1',
         '-reconnect_streamed', '1',
         '-reconnect_delay_max', '5',
+        // SECURITY: Restrict allowed protocols to prevent SSRF
+        '-protocol_whitelist', 'http,https,tcp,tls,crypto,pipe',
         '-i', inputSource,
         '-f', 's16le',
         '-ar', String(SAMPLE_RATE),
@@ -493,9 +618,23 @@ export class AudioPlayer extends EventEmitter {
       this.playbackTimeout = null;
     }
     
+    // Kill yt-dlp process if running
+    if (this.ytdlpProcess) {
+      try {
+        this.ytdlpProcess.kill('SIGKILL');
+      } catch (e) {
+        // Process may have already exited
+      }
+      this.ytdlpProcess = null;
+    }
+    
     // Kill FFmpeg
     if (this.ffmpegProcess) {
-      this.ffmpegProcess.kill('SIGKILL');
+      try {
+        this.ffmpegProcess.kill('SIGKILL');
+      } catch (e) {
+        // Process may have already exited
+      }
       this.ffmpegProcess = null;
     }
     

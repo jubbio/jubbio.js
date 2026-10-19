@@ -214,8 +214,46 @@ export class Shard extends EventEmitter {
 
   /**
    * Fetch a client property
+   * 
+   * ⚠️ SECURITY WARNING: This method internally uses eval().
+   * While it looks safer than direct eval(), it carries the same risks.
+   * NEVER pass user input to this method - it will result in Remote Code Execution (RCE).
+   * 
+   * @param prop - Property path to fetch (e.g., 'guilds.cache.size')
+   * @returns Promise resolving to the property value
+   * 
+   * @example
+   * // Safe: hardcoded property
+   * const guildCount = await shard.fetchClientValue('guilds.cache.size');
+   * 
+   * // UNSAFE: user input - DO NOT DO THIS!
+   * // await shard.fetchClientValue(userMessage); // RCE vulnerability!
    */
   async fetchClientValue(prop: string): Promise<any> {
+    // SECURITY: Validate prop to prevent code injection
+    // Only allow alphanumeric characters, dots, underscores, and array brackets
+    if (!/^[\w.[\]]+$/.test(prop)) {
+      throw new Error(`Invalid property path: contains disallowed characters`);
+    }
+    
+    // SECURITY: Block obvious code injection attempts
+    const dangerousPatterns = [
+      /\bprocess\b/,
+      /\brequire\b/,
+      /\bimport\b/,
+      /\beval\b/,
+      /\bFunction\b/,
+      /\bconstructor\b/,
+      /\b__proto__\b/,
+      /\bprototype\b/,
+    ];
+    
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(prop)) {
+        throw new Error(`Invalid property path: contains dangerous pattern`);
+      }
+    }
+    
     return this.eval(`this.${prop}`);
   }
 
@@ -393,6 +431,9 @@ export class ShardingManager extends EventEmitter {
 
   /**
    * Broadcast an eval to all shards
+   * 
+   * ⚠️ SECURITY WARNING: This method executes arbitrary code on all shard processes.
+   * NEVER pass user input to this method - it will result in Remote Code Execution (RCE).
    */
   async broadcastEval<T>(script: string | ((client: any) => T)): Promise<T[]> {
     const promises = [...this.shards.values()].map(shard => shard.eval(script));
@@ -401,8 +442,46 @@ export class ShardingManager extends EventEmitter {
 
   /**
    * Fetch a client value from all shards
+   * 
+   * ⚠️ SECURITY WARNING: This method internally uses broadcastEval() which executes code.
+   * While it looks safer than direct eval(), it carries the same risks.
+   * NEVER pass user input to this method - it will result in Remote Code Execution (RCE).
+   * 
+   * @param prop - Property path to fetch (e.g., 'guilds.cache.size')
+   * @returns Promise resolving to array of property values from all shards
+   * 
+   * @example
+   * // Safe: hardcoded property
+   * const guildCounts = await manager.fetchClientValues('guilds.cache.size');
+   * 
+   * // UNSAFE: user input - DO NOT DO THIS!
+   * // await manager.fetchClientValues(userMessage); // RCE vulnerability!
    */
   async fetchClientValues(prop: string): Promise<any[]> {
+    // SECURITY: Validate prop to prevent code injection
+    // Only allow alphanumeric characters, dots, underscores, and array brackets
+    if (!/^[\w.[\]]+$/.test(prop)) {
+      throw new Error(`Invalid property path: contains disallowed characters`);
+    }
+    
+    // SECURITY: Block obvious code injection attempts
+    const dangerousPatterns = [
+      /\bprocess\b/,
+      /\brequire\b/,
+      /\bimport\b/,
+      /\beval\b/,
+      /\bFunction\b/,
+      /\bconstructor\b/,
+      /\b__proto__\b/,
+      /\bprototype\b/,
+    ];
+    
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(prop)) {
+        throw new Error(`Invalid property path: contains dangerous pattern`);
+      }
+    }
+    
     return this.broadcastEval(`this.${prop}`);
   }
 
@@ -455,13 +534,39 @@ export class ShardClientUtil {
 
   /**
    * Fetch a client value from all shards
+   * 
+   * ⚠️ SECURITY WARNING: This method internally uses broadcastEval() which executes code.
+   * While it looks safer than direct eval(), it carries the same risks.
+   * NEVER pass user input to this method - it will result in Remote Code Execution (RCE).
+   * 
+   * @param prop - Property path to fetch (e.g., 'guilds.cache.size')
+   * @returns Promise resolving to array of property values from all shards
    */
   async fetchClientValues(prop: string): Promise<any[]> {
+    // SECURITY: Validate prop to prevent code injection
+    if (!/^[\w.[\]]+$/.test(prop)) {
+      throw new Error(`Invalid property path: contains disallowed characters`);
+    }
+    
+    const dangerousPatterns = [
+      /\bprocess\b/, /\brequire\b/, /\bimport\b/, /\beval\b/,
+      /\bFunction\b/, /\bconstructor\b/, /\b__proto__\b/, /\bprototype\b/,
+    ];
+    
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(prop)) {
+        throw new Error(`Invalid property path: contains dangerous pattern`);
+      }
+    }
+    
     return this.broadcastEval(`this.${prop}`);
   }
 
   /**
    * Broadcast an eval to all shards
+   * 
+   * ⚠️ SECURITY WARNING: This method executes arbitrary code on all shard processes.
+   * NEVER pass user input to this method - it will result in Remote Code Execution (RCE).
    */
   async broadcastEval<T>(script: string | ((client: any) => T)): Promise<T[]> {
     const _eval = typeof script === 'function' ? `(${script})(this)` : script;
