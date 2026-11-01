@@ -25,7 +25,7 @@ npm install @jubbio/voice
 ## Features
 
 - 🎵 **Audio Playback** - Play local files or stream from URLs
-- 📺 **YouTube Support** - Built-in yt-dlp integration
+- 📺 **Source-independent inputs** - Readable, async byte iterables, files and HTTP(S) media
 - 🔊 **LiveKit Backend** - High-quality, low-latency audio
 - ⏯️ **Playback Controls** - Play, pause, stop, volume
 - 📊 **Easy Queue Management** - Build music bots easily
@@ -92,7 +92,7 @@ client.on('interactionCreate', async (interaction) => {
       }
       
       const player = getPlayer(interaction.guildId);
-      const resource = createAudioResourceFromUrl(info.url);
+      const resource = createAudioResourceFromUrl(info.url, { useYtDlp: true });
       player.play(resource);
       
       const minutes = Math.floor(info.duration / 60);
@@ -150,7 +150,7 @@ const player = createAudioPlayer({
 
 ### createAudioResource(input, options?)
 
-Create an `AudioResource` from a file path.
+Create an `AudioResource` from a local file, HTTP(S) media URL, Node Readable or async byte iterable. The bot developer resolves platform pages into media; the player does not search or select a platform.
 
 ```typescript
 const resource = createAudioResource('/path/to/audio.mp3', {
@@ -158,19 +158,59 @@ const resource = createAudioResource('/path/to/audio.mp3', {
 });
 ```
 
+### Streams and formats
+
+```typescript
+import { createReadStream } from 'node:fs';
+import { createAudioResource, StreamType } from '@jubbio/voice';
+
+// A resolver is supplied by the bot author, for any platform.
+const stream = await myResolver.openMedia(platformLink);
+player.play(createAudioResource(stream));
+
+// Raw s16le PCM: 48 kHz stereo bypasses FFmpeg entirely.
+player.play(createAudioResource(pcmStream, {
+  inputType: StreamType.Raw, sampleRate: 48000, numChannels: 2,
+}));
+
+// Other input rates/channel counts are resampled to 48 kHz stereo.
+player.play(createAudioResource(monoPcmStream, {
+  inputType: StreamType.Raw, sampleRate: 44100, numChannels: 1,
+}));
+
+player.play(createAudioResource(createReadStream('song.ogg'), { inputType: StreamType.OggOpus }));
+player.play(createAudioResource('https://my-cdn.example/audio.m3u8', {
+  headers: { Authorization: 'Bearer ' + accessToken },
+}));
+```
+
+- `Arbitrary`: FFmpeg detects MP3, WAV, AAC, FLAC and other supported media.
+- `OggOpus` / `WebmOpus`: containerized Opus byte streams.
+- `Opus`: an async iterable or object-mode Readable yielding **one complete Opus packet per item**. Packet boundaries must be preserved. The library frames these packets as Ogg for decoding.
+- `Raw`: signed 16-bit little-endian PCM, with `sampleRate` and `numChannels`.
+
+Streams must yield Buffer/Uint8Array chunks. Playback takes ownership of the stream and closes
+it on stop, replacement, completion or error. Create a new stream/resource for another play.
+For async iterables, upstream cancellation follows the iterator's own return/cleanup behavior.
+
+HTTP(S) URLs may be direct audio or HLS manifests, including signed URLs and custom headers.
+The library does not impose a platform host list. Bot authors control which URLs/headers their
+resolver accepts. Platform web pages and search terms are not playable media inputs.
+
 ### createAudioResourceFromUrl(url, options?)
 
-Create an `AudioResource` from a URL (YouTube, SoundCloud, etc.).
+Create an `AudioResource` from a direct HTTP(S) media URL. Platform page extraction is opt-in through the legacy helper shown below.
 
 ```typescript
 const resource = createAudioResourceFromUrl('https://youtube.com/watch?v=...', {
+  useYtDlp: true, // Optional compatibility helper; requires yt-dlp
   metadata: { title: 'YouTube Video' }
 });
 ```
 
 ### probeAudioInfo(url)
 
-Get information about an audio URL.
+Optional yt-dlp metadata helper. Calling it explicitly requires yt-dlp; generic playback does not.
 
 ```typescript
 const info = await probeAudioInfo('https://youtube.com/watch?v=...');
@@ -268,8 +308,9 @@ connection.on('error', (error) => {
 ## Requirements
 
 - **Node.js** 18.0.0 or higher
-- **FFmpeg** installed and in PATH
-- **yt-dlp** installed (for YouTube support)
+- **FFmpeg** for encoded media or PCM resampling (`ffmpegPath` can override PATH).
+- Native 48 kHz stereo s16le PCM needs no FFmpeg.
+- **yt-dlp** only when explicitly calling `probeAudioInfo` or setting `useYtDlp: true`.
 
 ### Installing Dependencies
 
@@ -284,6 +325,35 @@ brew install ffmpeg yt-dlp
 # Windows
 # Download from ffmpeg.org and yt-dlp GitHub releases
 ```
+
+## Migration from implicit extraction
+
+Plain strings are file paths or media URLs, never automatic YouTube searches. Existing code
+that passes a platform page must supply its own resolved stream/URL, or explicitly opt into
+`createAudioResourceFromUrl(pageUrl, { useYtDlp: true })`. The compatibility helper is separate
+from the generic player and is not required for any other input.
+
+## Development checks
+
+The RTC runtime is pinned to `@livekit/rtc-node` 1.2.1. Install optional dependencies as well:
+they contain the native bindings for the deployment platform. Native verification on one
+operating system does not replace testing on the production operating system.
+
+Run `npm test` and `npm run build` from `voice/`. The regression tests use Node.js 22 or newer.
+The FFmpeg integration test runs when FFmpeg is installed; other tests replace the process and
+LiveKit boundaries. The native player regression test verifies recovery after a source failure without joining a room.
+These checks do not require network access or credentials.
+
+Gateway adapters must forward only the connected bot's own voice-state updates. Update
+`@jubbio/core` together with this package to include its voice-event filtering and adapter cleanup.
+For multiple bot clients in one process, use `getVoiceConnection(guildId, adapterCreator)` to
+select the client's connection explicitly.
+
+Playback keeps a bounded native audio queue. Pausing stops reading decoded audio rather than
+discarding it; a short amount of audio already queued natively can still play. Replacing a resource
+does not emit an intermediate `Idle` event. Natural completion and `stop()` still do.
+A replacement waits for any pending native capture to settle before submitting its first frame,
+including replacements started by an error/Idle handler.
 
 ## License
 

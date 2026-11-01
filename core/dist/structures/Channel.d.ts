@@ -69,7 +69,7 @@ export declare class TextChannel extends BaseChannel {
     constructor(client: Client, data: APIChannel);
     /**
      * Send a message to this channel
-     * ponytail: Bug #8 fix - embed tekil kullanımı, Bug #10 fix - flags desteği
+     * Bug #8 fix - embed tekil kullanımı, Bug #10 fix - flags desteği
      */
     send(options: string | MessageCreateOptions): Promise<Message>;
     /**

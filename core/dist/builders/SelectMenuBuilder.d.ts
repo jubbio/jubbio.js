@@ -56,12 +56,12 @@ export declare class StringSelectMenuBuilder {
      * Adds options to this select menu
      * Accepts individual options or an array of options
      */
-    addOptions(...options: (APISelectMenuOption | APISelectMenuOption[])[]): this;
+    addOptions(...options: (APISelectMenuOption | StringSelectMenuOptionBuilder | (APISelectMenuOption | StringSelectMenuOptionBuilder)[])[]): this;
     /**
      * Sets the options of this select menu
      * Accepts individual options or an array of options
      */
-    setOptions(...options: (APISelectMenuOption | APISelectMenuOption[])[]): this;
+    setOptions(...options: (APISelectMenuOption | StringSelectMenuOptionBuilder | (APISelectMenuOption | StringSelectMenuOptionBuilder)[])[]): this;
     /**
      * Removes, replaces, or inserts options
      * @param index The index to start at
@@ -133,8 +133,8 @@ export declare enum SelectMenuType {
 /**
  * Base interface for auto-populated select menus (User, Role, Mentionable, Channel)
  */
-interface APIAutoSelectMenuComponent {
-    type: number;
+export interface APIAutoSelectMenuComponent {
+    type: 5 | 6 | 7 | 8;
     custom_id: string;
     placeholder?: string;
     min_values?: number;

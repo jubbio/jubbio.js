@@ -53,6 +53,8 @@ export interface VoiceStateUpdate {
  * Options for creating an audio player
  */
 export interface CreateAudioPlayerOptions {
+  /** FFmpeg executable used only when decoding/resampling is necessary. */
+  ffmpegPath?: string;
   /** Behaviors for the audio player */
   behaviors?: {
     /** Whether to pause when no subscribers */
@@ -68,6 +70,12 @@ export interface CreateAudioPlayerOptions {
 export interface CreateAudioResourceOptions<T = unknown> {
   /** The type of the input stream */
   inputType?: StreamType;
+  /** Raw PCM input sample rate (signed 16-bit little-endian; default 48000). */
+  sampleRate?: number;
+  /** Raw PCM / raw Opus channel count (default 2). Output is always stereo. */
+  numChannels?: number;
+  /** Request headers for direct HTTP(S) media URLs. */
+  headers?: Record<string, string>;
   /** Metadata to attach to the resource */
   metadata?: T;
   /** Whether to inline the volume transformer */
@@ -79,7 +87,7 @@ export interface CreateAudioResourceOptions<T = unknown> {
 /**
  * Audio resource input - can be string URL, readable stream, or file path
  */
-export type AudioResourceInput = string | Readable;
+export type AudioResourceInput = string | URL | Readable | AsyncIterable<Uint8Array>;
 
 /**
  * Voice connection events

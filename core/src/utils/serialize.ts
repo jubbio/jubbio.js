@@ -1,5 +1,16 @@
 import { APIEmbed } from '../types';
 
+export function hasComponentsV2(components: any[] | undefined): boolean {
+  return !!components?.some(component => [9, 10, 11, 12, 13, 14, 17].includes(component?.type));
+}
+
+export function visitComponentText(components: any[] | undefined, visit: (content: string) => void): void {
+  for (const component of components ?? []) {
+    if (component?.type === 10 && typeof component.content === 'string') visit(component.content);
+    visitComponentText(component?.components, visit);
+  }
+}
+
 /**
  * Serialize components array (ActionRowBuilder/ButtonBuilder instances) to plain JSON.
  * Handles nested structures: ActionRow → components[] → Button/SelectMenu
@@ -7,19 +18,16 @@ import { APIEmbed } from '../types';
  * @param components - Array of components (may include builder instances)
  * @returns Serialized components as plain JSON objects
  */
+export function serializeComponentNode(value: any): any {
+  if (typeof value?.toJSON === 'function') return serializeComponentNode(value.toJSON());
+  if (Array.isArray(value)) return value.map(serializeComponentNode);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, serializeComponentNode(entry)]));
+  return value;
+}
+
 export function serializeComponents(components: any[] | undefined): any[] | undefined {
   if (!components) return undefined;
-  return components.map(row => {
-    // If it has a toJSON method (ActionRowBuilder), call it
-    const rowData = typeof row?.toJSON === 'function' ? row.toJSON() : row;
-    // Also serialize nested components (buttons, select menus inside action rows)
-    if (rowData?.components && Array.isArray(rowData.components)) {
-      rowData.components = rowData.components.map((comp: any) =>
-        typeof comp?.toJSON === 'function' ? comp.toJSON() : comp
-      );
-    }
-    return rowData;
-  });
+  return components.map(serializeComponentNode);
 }
 
 /**

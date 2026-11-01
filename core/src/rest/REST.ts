@@ -15,7 +15,7 @@ import {
   AnyActionRow,
   APIAuditLog
 } from '../types';
-import { serializeComponents, normalizeEmbed } from '../utils/serialize';
+import { serializeComponents, normalizeEmbed, hasComponentsV2, visitComponentText } from '../utils/serialize';
 import { RESTError, RateLimitError } from './errors';
 
 /**
@@ -46,11 +46,6 @@ interface CachedUser {
   displayName?: string;
   cachedAt: number;
 }
-
-/**
- * Sensitive field names that should be redacted in logs
- */
-const SENSITIVE_FIELDS = ['token', 'authorization', 'password', 'secret', 'api_key', 'apikey', 'api-key'];
 
 /**
  * Regex to validate IDs in URL paths.
@@ -85,40 +80,6 @@ export class REST {
 
   constructor(baseUrl: string = 'https://gateway.jubbio.com/api/v1') {
     this.baseUrl = baseUrl;
-  }
-
-  /**
-   * Redact sensitive data from objects/strings for safe logging.
-   * Masks fields named 'token', 'authorization', 'password', 'secret', 'api_key' with '[REDACTED]'
-   */
-  private redactSensitiveData(data: unknown): unknown {
-    if (data === null || data === undefined) {
-      return data;
-    }
-
-    if (typeof data === 'string') {
-      // Redact Bearer/Bot tokens in authorization headers
-      return data.replace(/\b(Bearer|Bot)\s+[^\s"']+/gi, '$1 [REDACTED]');
-    }
-
-    if (Array.isArray(data)) {
-      return data.map(item => this.redactSensitiveData(item));
-    }
-
-    if (typeof data === 'object') {
-      const result: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
-        const keyLower = key.toLowerCase();
-        if (SENSITIVE_FIELDS.some(field => keyLower.includes(field))) {
-          result[key] = '[REDACTED]';
-        } else {
-          result[key] = this.redactSensitiveData(value);
-        }
-      }
-      return result;
-    }
-
-    return data;
   }
 
   // ==================== Mention Helpers ====================
@@ -187,7 +148,7 @@ export class REST {
    * @returns Original content and mentions data
    */
   private processMentions(content: string | number | unknown, existingMentions?: MentionsData): { content: string; mentions: MentionsData } {
-    // ponytail: Bug #5 fix - number veya diğer tipler string'e çevrilir
+    // Bug #5 fix - number veya diğer tipler string'e çevrilir
     const contentStr = String(content ?? '');
     
     const mentions: MentionsData = {
@@ -243,20 +204,23 @@ export class REST {
    * Automatically converts mentions to our format
    */
   private prepareMessageData(data: {
+    flags?: number;
     content?: string;
     embeds?: APIEmbed[];
     components?: AnyActionRow[] | unknown[];
     mentions?: MentionsData;
     message_reference?: { message_id: string };
   }): { 
-    content?: string; 
+    flags?: number;
+    content?: string;
     embeds?: APIEmbed[]; 
     components?: unknown[]; 
     mentions?: MentionsData;
     message_reference?: { message_id: string };
   } {
     const result: { 
-      content?: string; 
+      flags?: number;
+    content?: string;
       embeds?: APIEmbed[]; 
       components?: unknown[]; 
       mentions?: MentionsData;
@@ -269,6 +233,8 @@ export class REST {
     }
 
     let allMentions: MentionsData = { ...data.mentions };
+    if (hasComponentsV2(result.components)) result.flags = (data.flags ?? 0) | 32768;
+    visitComponentText(result.components, content => { allMentions = this.processMentions(content, allMentions).mentions; });
 
     // Process mentions in content if present
     if (data.content) {
@@ -350,52 +316,50 @@ export class REST {
   /**
    * Make an authenticated request with rate limit retry
    */
-  private async request<T>(method: string, path: string, body?: any, retries = 3): Promise<T> {
-    const url = `${this.baseUrl}${path}`;
-    
-    // Debug log - only when DEBUG_REST env is set, with sensitive data redacted
-    if (process.env.DEBUG_REST) {
-      const safeBody = body ? JSON.stringify(this.redactSensitiveData(body)) : '';
-      console.log(`[REST] ${method} ${url}`, safeBody);
-    }
-    
-    const response = await fetch(url, {
-      method,
-      headers: {
-        'Authorization': `Bot ${this.token}`,
-        'Content-Type': 'application/json',
-        'User-Agent': 'JubbioBot/1.0 (+https://jubbio.com)'
-      },
-      body: body ? JSON.stringify(body) : undefined
+  private globalResetAt = 0;
+  private readonly routeResetAt = new Map<string, number>();
+
+  private async request<T>(method: string, path: string, body?: any): Promise<T> {
+    return this.requestBody<T>(method, path, body === undefined ? undefined : JSON.stringify(body), {
+      'Content-Type': 'application/json'
     });
+  }
 
-    // ponytail: Rate limit handling - retry after delay instead of crashing
-    if (response.status === 429) {
-      const errorData = await response.json().catch(() => ({})) as { retry_after?: number };
-      const retryAfter = (errorData.retry_after || 1) * 1000; // Convert to ms
-      
-      if (retries > 0) {
-        if (process.env.DEBUG_REST) {
-          console.log(`[REST] Rate limited, retrying in ${retryAfter}ms (${retries} retries left)`);
-        }
-        await new Promise(resolve => setTimeout(resolve, retryAfter));
-        return this.request<T>(method, path, body, retries - 1);
+  /** Shared transport; JSON and buffered multipart bodies are replayable on HTTP 429. */
+  private async requestBody<T>(method: string, path: string, body?: string | Buffer, headers: Record<string, string> = {}): Promise<T> {
+    const route = method + ' ' + path.replace(/\/\d+(?=\/|$)/g, '/:id');
+    for (let attempt = 0; ; attempt++) {
+      let delay: number;
+      while ((delay = Math.max(this.globalResetAt, this.routeResetAt.get(route) ?? 0) - Date.now()) > 0) {
+        await new Promise(resolve => setTimeout(resolve, Math.min(delay, 2_147_483_647)));
       }
-      
-      // No retries left, throw RateLimitError
-      throw new RateLimitError(retryAfter, method, path);
+      this.routeResetAt.delete(route);
+      if (process.env.DEBUG_REST) console.log('[REST]', method, path.replace(/(\/interactions\/(?:webhooks\/)?[^/]+\/)[^/]+/, '$1[REDACTED]'));
+      const response = await fetch(this.baseUrl + path, {
+        method,
+        headers: { Authorization: 'Bot ' + this.token, 'User-Agent': 'JubbioBot/1.0 (+https://jubbio.com)', ...headers },
+        body
+      });
+      if (response.status === 429) {
+        const data = await response.json().catch(() => ({})) as { retry_after?: number; global?: boolean };
+        const header = response.headers.get('Retry-After');
+        const seconds = data.retry_after ?? (header === null ? undefined : Number(header));
+        const retryAfter = Math.max(10, Number.isFinite(seconds) && Number(seconds) >= 0
+          ? Math.ceil(Number(seconds) * 1000)
+          : header && Number.isFinite(Date.parse(header)) ? Math.max(0, Date.parse(header) - Date.now()) : 1000);
+        const resetAt = Date.now() + retryAfter;
+        if (data.global === true || response.headers.get('X-RateLimit-Global') === 'true') {
+          this.globalResetAt = Math.max(this.globalResetAt, resetAt);
+        } else {
+          this.routeResetAt.set(route, Math.max(this.routeResetAt.get(route) ?? 0, resetAt));
+        }
+        if (attempt >= 3) throw new RateLimitError(retryAfter, method, path);
+        continue;
+      }
+      if (!response.ok) throw new RESTError(response.status, method, path, await response.text());
+      const text = await response.text();
+      return text ? JSON.parse(text) : {} as T;
     }
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new RESTError(response.status, method, path, error);
-    }
-
-    // Handle empty responses
-    const text = await response.text();
-    if (!text) return {} as T;
-    
-    return JSON.parse(text);
   }
 
   // ==================== Messages ====================
@@ -413,20 +377,20 @@ export class REST {
     content?: string;
     embeds?: APIEmbed[];
     components?: any[];
+    flags?: number;
     mentions?: MentionsData;
     files?: Array<{ name: string; data: Buffer }>;
     message_reference?: { message_id: string };
     interactionId?: string;
-    flags?: number;  // ponytail: Bug #10 - flags desteği (MessageFlags.SuppressEmbeds vb.)
   }, data?: {
     content?: string;
     embeds?: APIEmbed[];
     components?: any[];
+    flags?: number;
     mentions?: MentionsData;
     files?: Array<{ name: string; data: Buffer }>;
     message_reference?: { message_id: string };
     interactionId?: string;
-    flags?: number;  // ponytail: Bug #10 - flags desteği
   }): Promise<APIMessage> {
     // İki kullanım şekli:
     // 1. createMessage(guildId, channelId, data) - guildId ile (tercih edilen)
@@ -452,9 +416,9 @@ export class REST {
         messageData.interaction_id = data.interactionId;
       }
       
-      // ponytail: Bug #10 - Add flags if provided
+      // Bug #10 - Add flags if provided
       if (data.flags !== undefined) {
-        messageData.flags = data.flags;
+        messageData.flags = (messageData.flags ?? 0) | data.flags;
       }
     } else if (typeof channelIdOrData === 'object') {
       // Eski format: createMessage(channelId, data) - guildId yok
@@ -481,6 +445,7 @@ export class REST {
     content?: string;
     embeds?: APIEmbed[];
     components?: any[];
+    flags?: number;
   }): Promise<{ id: string; ephemeral: boolean; flags: number }> {
     // SECURITY: Validate IDs to prevent path traversal
     validateId(guildId, 'guildId');
@@ -507,6 +472,7 @@ export class REST {
     content?: string;
     embeds?: APIEmbed[];
     components?: any[];
+    flags?: number;
   }): Promise<APIMessage> {
     const processedData = this.prepareMessageData(data);
     // Send to /bot/dm with recipient_user_id in body
@@ -524,6 +490,7 @@ export class REST {
     content?: string;
     embeds?: APIEmbed[];
     components?: any[];
+    flags?: number;
   }): Promise<APIMessage> {
     const processedData = this.prepareMessageData(data);
     return this.request<APIMessage>('POST', `/bot/dm/${channelId}`, processedData);
@@ -531,18 +498,34 @@ export class REST {
 
   /**
    * Create a DM message with file attachment
-   * ponytail: DM için file + embed desteği
+   * DM için file + embed desteği
    */
   async createDMMessageWithFile(userId: string, data: {
     content?: string;
     embeds?: APIEmbed[];
     components?: any[];
+    flags?: number;
   }, files: Array<{ name: string; data: Buffer | string; contentType?: string }>): Promise<APIMessage> {
+    return this.sendDMFiles('/bot/dm', data, files, userId);
+  }
+
+  /** Send attachments to an existing DM channel without requiring a recipient ID. */
+  async createDMMessageToChannelWithFile(channelId: string, data: {
+    content?: string; embeds?: APIEmbed[]; flags?: number; components?: any[];
+  }, files: Array<{ name: string; data: Buffer | string; contentType?: string }>): Promise<APIMessage> {
+    validateId(channelId, 'channelId');
+    return this.sendDMFiles('/bot/dm/' + channelId, data, files);
+  }
+
+  private async sendDMFiles(path: string, data: { content?: string; embeds?: APIEmbed[]; flags?: number; components?: any[] },
+    files: Array<{ name: string; data: Buffer | string; contentType?: string }>, userId?: string): Promise<APIMessage> {
     const FormData = require('form-data');
     const form = new FormData();
+    data = { ...data, ...this.prepareMessageData(data) };
+    if (data.flags !== undefined) form.append('flags', String(data.flags));
 
     // Add recipient_user_id
-    form.append('recipient_user_id', userId);
+    if (userId !== undefined) form.append('recipient_user_id', userId);
 
     // Add content if provided
     if (data.content) {
@@ -570,23 +553,7 @@ export class REST {
       });
     }
 
-    const url = `${this.baseUrl}/bot/dm`;
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bot ${this.token}`,
-        ...form.getHeaders()
-      },
-      body: form.getBuffer()
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`DM file upload failed: ${response.status} ${errorText}`);
-    }
-
-    return response.json() as Promise<APIMessage>;
+    return this.requestBody<APIMessage>('POST', path, form.getBuffer(), form.getHeaders());
   }
 
   /**
@@ -597,6 +564,7 @@ export class REST {
     content?: string;
     embeds?: APIEmbed[];
     components?: any[];
+    flags?: number;
     mentions?: MentionsData;
   }): Promise<APIMessage> {
     // SECURITY: Validate IDs to prevent path traversal
@@ -690,42 +658,25 @@ export class REST {
       contentType: file.contentType || 'text/plain'
     });
     
-    const url = `${this.baseUrl}/bot/guilds/${guildId}/channels/${channelId}/attachments`;
-    
-    if (process.env.DEBUG_REST) {
-      console.log(`[REST] Uploading attachment: ${file.name} (${file.data.length} bytes)`);
-    }
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bot ${this.token}`,
-        ...form.getHeaders()
-      },
-      body: form.getBuffer()
-    });
-    
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`API Error ${response.status}: ${error}`);
-    }
-    
-    return response.json() as Promise<{ id: string; url: string; filename: string }>;
+    return this.requestBody<{ id: string; url: string; filename: string }>('POST', `/bot/guilds/${guildId}/channels/${channelId}/attachments`, form.getBuffer(), form.getHeaders());
   }
 
   /**
    * Create a message with a file attachment
-   * ponytail: embeds ve components desteği eklendi
+   * embeds ve components desteği eklendi
    */
   async createMessageWithFile(guildId: string, channelId: string, data: {
     content?: string;
     embeds?: APIEmbed[];
     components?: any[];
+    flags?: number;
     file: { name: string; data: Buffer; contentType?: string };
     interactionId?: string;
   }): Promise<APIMessage> {
     const FormData = require('form-data');
     const form = new FormData();
+    data = { ...data, ...this.prepareMessageData(data) };
+    if (data.flags !== undefined) form.append('flags', String(data.flags));
     
     // Add content if provided
     if (data.content) {
@@ -763,27 +714,7 @@ export class REST {
       contentType: data.file.contentType || 'text/plain'
     });
     
-    const url = `${this.baseUrl}/bot/guilds/${guildId}/channels/${channelId}/messages`;
-    
-    if (process.env.DEBUG_REST) {
-      console.log(`[REST] Creating message with file: ${data.file.name} (${data.file.data.length} bytes)${data.interactionId ? ` [interaction: ${data.interactionId}]` : ''}`);
-    }
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bot ${this.token}`,
-        ...form.getHeaders()
-      },
-      body: form.getBuffer()
-    });
-    
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`API Error ${response.status}: ${error}`);
-    }
-    
-    return response.json() as Promise<APIMessage>;
+    return this.requestBody<APIMessage>('POST', `/bot/guilds/${guildId}/channels/${channelId}/messages`, form.getBuffer(), form.getHeaders());
   }
 
   // ==================== Interactions ====================
@@ -802,7 +733,7 @@ export class REST {
     try {
       // Process mentions in response data if present
       let processedData = data;
-      if (data.data && (data.data.content || data.data.embeds)) {
+      if (data.data && (data.data.content !== undefined || data.data.embeds || data.data.components)) {
         processedData = {
           ...data,
           data: this.prepareMessageData(data.data)
@@ -814,7 +745,7 @@ export class REST {
         console.log(`✅ Interaction response sent`);
       }
     } catch (error) {
-      console.error(`❌ Interaction response error:`, error);
+      if (process.env.DEBUG_REST) console.error('Interaction response failed');
       throw error;
     }
   }
@@ -828,6 +759,7 @@ export class REST {
     content?: string;
     embeds?: APIEmbed[];
     components?: any[];
+    flags?: number;
     mentions?: MentionsData;
     files?: Array<{ name: string; data: Buffer; contentType?: string }>;
   }, guildId?: string, channelId?: string, interactionId?: string): Promise<void> {
@@ -842,7 +774,7 @@ export class REST {
         console.log(`[REST] editInteractionResponse with ${data.files.length} files - using createMessageWithFile`);
       }
       
-      // Create message with file - ponytail: embeds ve components da geçiriliyor
+      // Create message with file - embeds ve components da geçiriliyor
       const file = data.files[0]; // For now, support single file
       await this.createMessageWithFile(guildId, channelId, {
         content: processedData.content,
@@ -864,7 +796,8 @@ export class REST {
       const payload: any = {
         interaction_id: interactionId
       };
-      if (processedData.content !== undefined) payload.content = processedData.content;
+      if (processedData.flags !== undefined) payload.flags = processedData.flags;
+    if (processedData.content !== undefined) payload.content = processedData.content;
       if (processedData.embeds) payload.embeds = processedData.embeds;
       if (processedData.components) payload.components = processedData.components;
       if (processedData.mentions) payload.mentions = processedData.mentions;
@@ -875,6 +808,7 @@ export class REST {
     
     // Fallback: Regular edit without files (webhook PATCH)
     const payload: any = {};
+    if (processedData.flags !== undefined) payload.flags = processedData.flags;
     if (processedData.content !== undefined) payload.content = processedData.content;
     if (processedData.embeds) payload.embeds = processedData.embeds;
     if (processedData.components) payload.components = processedData.components;
@@ -900,8 +834,8 @@ export class REST {
     content?: string;
     embeds?: APIEmbed[];
     components?: any[];
-    mentions?: MentionsData;
     flags?: number;
+    mentions?: MentionsData;
     files?: Array<{ name: string; data: Buffer; contentType?: string }>;
   }): Promise<void> {
     const appId = this.getApplicationId();
@@ -911,6 +845,7 @@ export class REST {
     if (data.files && data.files.length > 0) {
       const FormData = require('form-data');
       const form = new FormData();
+    data = { ...data, ...this.prepareMessageData(data) };
 
       // Add content
       if (data.content) {
@@ -935,31 +870,14 @@ export class REST {
       }
 
       // Add files
-      data.files.forEach((file, index) => {
+      data.files!.forEach((file, index) => {
         form.append(`files[${index}]`, file.data, {
           filename: file.name,
           contentType: file.contentType || 'application/octet-stream'
         });
       });
 
-      const url = `${this.baseUrl}${endpoint}`;
-      if (process.env.DEBUG_REST) {
-        console.log(`[REST] createFollowup with ${data.files.length} file(s)`);
-      }
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bot ${this.token}`,
-          ...form.getHeaders()
-        },
-        body: form.getBuffer()
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Followup with file failed: ${response.status} - ${errorText}`);
-      }
+      await this.requestBody<void>('POST', endpoint, form.getBuffer(), form.getHeaders());
     } else {
       // No files, use JSON
       const processedData = this.prepareMessageData(data);

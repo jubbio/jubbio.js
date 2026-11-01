@@ -96,6 +96,7 @@ export class Client extends EventEmitter {
   /** Voice state update handlers (for voice adapters) */
   private voiceStateHandlers: Map<string, (data: any) => void> = new Map();
   private voiceServerHandlers: Map<string, (data: any) => void> = new Map();
+  private voiceDestroyHandlers: Map<string, () => void> = new Map();
 
   /** Whether the client is currently in the login flow */
   private _loginState: 'idle' | 'connecting' | 'ready' = 'idle';
@@ -535,7 +536,7 @@ export class Client extends EventEmitter {
         break;
         
       case 'PRESENCE_UPDATE': {
-        // ponytail: update guild onlineCount based on status change
+        // update guild onlineCount based on status change
         const guildId = data.guild_id;
         const status = data.status;
         if (guildId) {
@@ -620,7 +621,11 @@ export class Client extends EventEmitter {
    * Create a voice adapter for a guild
    */
   private createVoiceAdapter(guildId: string): void {
+    if (this.voice.adapters.has(guildId)) return;
     const adapter: VoiceAdapterCreator = (methods) => {
+      // A guild has one active connection per client.
+      this.voiceDestroyHandlers.get(guildId)?.();
+      this.voiceDestroyHandlers.set(guildId, methods.destroy);
       // Store handlers for this guild
       this.voiceStateHandlers.set(guildId, methods.onVoiceStateUpdate);
       this.voiceServerHandlers.set(guildId, methods.onVoiceServerUpdate);
@@ -634,6 +639,8 @@ export class Client extends EventEmitter {
           return false;
         },
         destroy: () => {
+          if (this.voiceDestroyHandlers.get(guildId) !== methods.destroy) return;
+          this.voiceDestroyHandlers.delete(guildId);
           this.voiceStateHandlers.delete(guildId);
           this.voiceServerHandlers.delete(guildId);
         }
@@ -678,6 +685,7 @@ export class Client extends EventEmitter {
     const guild = this.guilds.get(data.id);
     if (guild) {
       this.guilds.delete(data.id);
+      this.voiceDestroyHandlers.get(data.id)?.();
       this.voice.adapters.delete(data.id);
       this.emit('guildDelete', guild);
     }
@@ -795,8 +803,8 @@ export class Client extends EventEmitter {
     }
     
     // Forward to voice adapter if exists
-    const handler = this.voiceStateHandlers.get(guildId);
-    if (handler) {
+    const handler = this.voiceStateHandlers.get(String(guildId));
+    if (handler && this.user && String(userId) === String(this.user.id)) {
       handler(data);
     }
     
@@ -810,7 +818,7 @@ export class Client extends EventEmitter {
     const guildId = data.guild_id;
     
     // Forward to voice adapter if exists
-    const handler = this.voiceServerHandlers.get(guildId);
+    const handler = this.voiceServerHandlers.get(String(guildId));
     if (handler) {
       handler({
         token: data.token,
@@ -874,6 +882,11 @@ export class Client extends EventEmitter {
    * Destroy the client
    */
   destroy(): void {
+    for (const destroy of [...this.voiceDestroyHandlers.values()]) destroy();
+    this.voiceDestroyHandlers.clear();
+    this.voiceStateHandlers.clear();
+    this.voiceServerHandlers.clear();
+    this.voice.adapters.clear();
     this._loginState = 'idle';
     this._reconnectAttempts = this._maxReconnectAttempts + 1; // Prevent reconnect
     this.cleanup();

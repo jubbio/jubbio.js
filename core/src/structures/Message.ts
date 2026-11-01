@@ -201,7 +201,7 @@ export class Message {
     this.id = data.id;
     this.channelId = data.channel_id;
     this.guildId = data.guild_id;
-    // ponytail: author may be missing in minimal message payloads (e.g., interaction.message)
+    // author may be missing in minimal message payloads (e.g., interaction.message)
     this.author = data.author ? new User(data.author, client) : new User({ id: '0', username: 'Unknown' }, client);
     this.content = data.content ?? '';
     
@@ -226,7 +226,7 @@ export class Message {
 
   /**
    * The channel this message was sent in
-   * ponytail: refactored - artık TextChannel instance döndürüyor, DRY
+   * refactored - artık TextChannel instance döndürüyor, DRY
    * Caches the TextChannel instance for performance
    */
   get channel(): TextChannel {
@@ -277,11 +277,11 @@ export class Message {
 
   /**
    * Reply to this message
-   * ponytail: Bug #8 fix - embed tekil, Bug #10 fix - flags desteği
+   * Bug #8 fix - embed tekil, Bug #10 fix - flags desteği
    */
   async reply(options: string | MessageCreateOptions): Promise<Message> {
     const content = typeof options === 'string' ? options : options.content;
-    // ponytail: Bug #8 fix - embed tekil kullanımı
+    // Bug #8 fix - embed tekil kullanımı
     const rawEmbeds = typeof options === 'string' 
       ? undefined 
       : (options.embeds || (options.embed ? [options.embed] : undefined));
@@ -309,6 +309,7 @@ export class Message {
     const components = typeof options === 'string' ? undefined : serializeComponents(options.components);
     
     const data = await this.client.rest.editMessage(this.guildId || '', this.channelId, this.id, {
+      flags: typeof options === 'string' ? undefined : options.flags,
       content,
       embeds,
       components,

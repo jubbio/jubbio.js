@@ -80,13 +80,13 @@ export class StringSelectMenuBuilder {
    * Adds options to this select menu
    * Accepts individual options or an array of options
    */
-  addOptions(...options: (APISelectMenuOption | APISelectMenuOption[])[]): this {
+  addOptions(...options: (APISelectMenuOption | StringSelectMenuOptionBuilder | (APISelectMenuOption | StringSelectMenuOptionBuilder)[])[]): this {
     if (!this.data.options) this.data.options = [];
     for (const opt of options) {
       if (Array.isArray(opt)) {
-        this.data.options.push(...opt);
+        this.data.options.push(...opt.map(option => option instanceof StringSelectMenuOptionBuilder ? option.toJSON() : option));
       } else {
-        this.data.options.push(opt);
+        this.data.options.push(opt instanceof StringSelectMenuOptionBuilder ? opt.toJSON() : opt);
       }
     }
     return this;
@@ -96,13 +96,13 @@ export class StringSelectMenuBuilder {
    * Sets the options of this select menu
    * Accepts individual options or an array of options
    */
-  setOptions(...options: (APISelectMenuOption | APISelectMenuOption[])[]): this {
+  setOptions(...options: (APISelectMenuOption | StringSelectMenuOptionBuilder | (APISelectMenuOption | StringSelectMenuOptionBuilder)[])[]): this {
     this.data.options = [];
     for (const opt of options) {
       if (Array.isArray(opt)) {
-        this.data.options.push(...opt);
+        this.data.options.push(...opt.map(option => option instanceof StringSelectMenuOptionBuilder ? option.toJSON() : option));
       } else {
-        this.data.options.push(opt);
+        this.data.options.push(opt instanceof StringSelectMenuOptionBuilder ? opt.toJSON() : opt);
       }
     }
     return this;
@@ -220,8 +220,8 @@ export enum SelectMenuType {
 /**
  * Base interface for auto-populated select menus (User, Role, Mentionable, Channel)
  */
-interface APIAutoSelectMenuComponent {
-  type: number;
+export interface APIAutoSelectMenuComponent {
+  type: 5 | 6 | 7 | 8;
   custom_id: string;
   placeholder?: string;
   min_values?: number;

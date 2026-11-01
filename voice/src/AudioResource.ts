@@ -1,207 +1,109 @@
-import { Readable } from 'stream';
-import { spawn } from 'child_process';
+import { createReadStream } from 'fs';
+import path from 'path';
+import { Readable, addAbortSignal } from 'stream';
+import { fileURLToPath } from 'url';
 import { StreamType } from './enums';
 import { CreateAudioResourceOptions, AudioResourceInput } from './types';
+import { opusPacketsToOgg } from './opusStream';
+import { extractAudioWithYtDlp } from './ytDlp';
 
-/**
- * Represents an audio resource that can be played
- */
 export class AudioResource<T = unknown> {
-  /** Metadata attached to this resource */
   public readonly metadata: T;
-  
-  /** Whether playback has started */
   public started = false;
-  
-  /** Whether playback has ended */
   public ended = false;
-  
-  /** The input source (URL or file path) */
-  private inputSource: string;
-  
-  /** Stream type */
-  private streamType: StreamType;
-  
-  /** Volume (0-1) */
+  public readonly inputType: StreamType;
+  public readonly sampleRate: number;
+  public readonly numChannels: number;
+  public readonly headers: Record<string, string>;
+  private readonly input: Exclude<AudioResourceInput, URL>;
   private volume = 1;
 
-  constructor(
-    input: AudioResourceInput,
-    options: CreateAudioResourceOptions<T> = {}
-  ) {
+  constructor(input: AudioResourceInput, options: CreateAudioResourceOptions<T> = {}) {
     this.metadata = options.metadata as T;
-    this.streamType = options.inputType || StreamType.Arbitrary;
-    
-    if (typeof input === 'string') {
-      this.inputSource = input;
+    this.inputType = options.inputType ?? StreamType.Arbitrary;
+    this.sampleRate = options.sampleRate ?? 48000;
+    this.numChannels = options.numChannels ?? 2;
+    this.headers = { ...options.headers };
+    if (!Number.isInteger(this.sampleRate) || this.sampleRate < 8000 || this.sampleRate > 192000) throw new RangeError('Invalid input sample rate');
+    if (!Number.isInteger(this.numChannels) || this.numChannels < 1 || this.numChannels > 8) throw new RangeError('Invalid input channel count');
+    for (const [key, value] of Object.entries(this.headers)) {
+      if (!key || /[\r\n:]/.test(key) || /[\r\n]/.test(value)) throw new Error('Invalid media request header');
+    }
+    if (input instanceof URL || typeof input === 'string') {
+      const value = String(input);
+      if (!value.trim()) throw new TypeError('Audio input must not be empty');
+      if (input instanceof URL || /^[a-z][a-z\d+.-]*:\/\//i.test(value)) {
+        const url = new URL(value);
+        if (url.protocol === 'file:') this.input = fileURLToPath(url);
+        else if (url.protocol === 'http:' || url.protocol === 'https:') this.input = url.href;
+        else throw new Error('Only file paths and HTTP(S) media URLs are supported');
+      } else this.input = path.resolve(value);
     } else {
-      // For streams, we'd need to handle differently
-      // For now, throw an error
-      throw new Error('Stream input not yet supported. Use URL or file path.');
+      if (!input || typeof input[Symbol.asyncIterator] !== 'function') throw new TypeError('Audio input must be a file, URL, Readable or async byte iterable');
+      if (this.inputType === StreamType.Opus && input instanceof Readable && !input.readableObjectMode) {
+        throw new Error('Raw Opus requires an async iterable or object-mode Readable with one packet per item; use OggOpus/WebmOpus for byte streams');
+      }
+      this.input = input;
+    }
+    if (this.inputType === StreamType.Opus && (typeof this.input === 'string' || this.numChannels > 2)) {
+      throw new Error('Raw Opus requires mono/stereo packet input; use OggOpus/WebmOpus for files and URLs');
     }
   }
 
-  /**
-   * Get the input source for FFmpeg
-   * @internal
-   */
-  getInputSource(): string {
-    return this.inputSource;
+  /** @internal */
+  getInputSource(): Exclude<AudioResourceInput, URL> { return this.input; }
+
+  /** @internal: opens lazily, and playback cancellation owns/destroys the returned stream. */
+  async openStream(signal: AbortSignal): Promise<Readable> {
+    let stream: Readable;
+    if (typeof this.input === 'string') {
+      if (/^https?:\/\//.test(this.input)) {
+        const response = await fetch(this.input, { headers: this.headers, signal });
+        if (!response.ok || !response.body) {
+          await response.body?.cancel();
+          throw new Error(`Media request failed: HTTP ${response.status}`);
+        }
+        stream = Readable.fromWeb(response.body);
+      } else stream = createReadStream(this.input);
+    } else {
+      const input = this.input;
+      if (input instanceof Readable) {
+        input.on('error', () => {});
+        addAbortSignal(signal, input);
+      }
+      const bytes = (async function* () {
+        for await (const chunk of input) {
+          if (!(chunk instanceof Uint8Array)) throw new TypeError('Audio streams must yield Uint8Array or Buffer chunks');
+          yield chunk;
+        }
+      })();
+      stream = Readable.from(this.inputType === StreamType.Opus ? opusPacketsToOgg(bytes, this.numChannels) : bytes, { objectMode: false });
+    }
+    // Cancellation can occur before the player's reader attaches on the next microtask.
+    stream.on('error', () => {});
+    return addAbortSignal(signal, stream);
   }
 
-  /**
-   * Set the volume (0-1)
-   */
   setVolume(volume: number): void {
+    if (!Number.isFinite(volume)) throw new RangeError('Volume must be a finite number');
     this.volume = Math.max(0, Math.min(1, volume));
   }
-
-  /**
-   * Get the current volume
-   */
-  getVolume(): number {
-    return this.volume;
-  }
+  getVolume(): number { return this.volume; }
 }
 
-/**
- * Options for creating audio resource from URL
- */
 export interface CreateAudioResourceFromUrlOptions<T = unknown> extends CreateAudioResourceOptions<T> {
-  /** Use yt-dlp to extract audio URL */
+  /** Explicit, optional extraction helper. The generic player never starts yt-dlp. */
   useYtDlp?: boolean;
-  /** Path to yt-dlp binary */
   ytDlpPath?: string;
 }
 
-/**
- * Create an audio resource from various inputs
- */
-export function createAudioResource<T = unknown>(
-  input: AudioResourceInput,
-  options?: CreateAudioResourceOptions<T>
-): AudioResource<T> {
+export function createAudioResource<T = unknown>(input: AudioResourceInput, options?: CreateAudioResourceOptions<T>): AudioResource<T> {
   return new AudioResource(input, options);
 }
 
-/**
- * Create an audio resource from a YouTube/streaming URL
- * Stores the original URL - extraction happens at playback time
- */
-export function createAudioResourceFromUrl<T = unknown>(
-  url: string,
-  options: CreateAudioResourceFromUrlOptions<T> = {}
-): AudioResource<T> {
-  // Don't extract stream URL here - just store the original URL
-  // The AudioPlayer will use yt-dlp at playback time
-  return new AudioResource(url, options);
+export function createAudioResourceFromUrl<T = unknown>(url: string, options: CreateAudioResourceFromUrlOptions<T> = {}): AudioResource<T> {
+  return new AudioResource(options.useYtDlp ? extractAudioWithYtDlp(url, options.ytDlpPath) : new URL(url), options);
 }
 
-/**
- * Check if URL is a streaming service URL
- */
-function isStreamingUrl(url: string): boolean {
-  const streamingDomains = [
-    'youtube.com',
-    'youtu.be',
-    'soundcloud.com',
-    'spotify.com',
-    'twitch.tv',
-    'vimeo.com'
-  ];
-  
-  return streamingDomains.some(domain => url.includes(domain));
-}
-
-/**
- * Check if input is a valid URL
- */
-function isValidUrl(input: string): boolean {
-  try {
-    new URL(input);
-    return true;
-  } catch {
-    return input.startsWith('http://') || input.startsWith('https://');
-  }
-}
-
-/**
- * Probe audio info from a URL or search query
- * If input is not a URL, it will search YouTube
- */
-export async function probeAudioInfo(input: string, ytDlpPath?: string): Promise<{
-  title: string;
-  duration: number;
-  thumbnail?: string;
-  url: string;
-}> {
-  return new Promise((resolve, reject) => {
-    const isWindows = process.platform === 'win32';
-    const defaultYtDlpPath = isWindows ? 'yt-dlp' : '~/.local/bin/yt-dlp';
-    const ytdlpBin = ytDlpPath || defaultYtDlpPath;
-    
-    // If not a valid URL, treat as YouTube search
-    let searchQuery = input;
-    if (!isValidUrl(input)) {
-      searchQuery = `ytsearch1:${input}`;
-    }
-    
-    // SECURITY: Use spawn with arguments array instead of shell to prevent command injection
-    // Never pass user input through shell interpolation
-    const args = ['--no-playlist', '--no-warnings', '-j', searchQuery];
-    
-    console.log('[probeAudioInfo] Running:', ytdlpBin, args.join(' '));
-    
-    // Spawn without shell - arguments are passed safely as array
-    const ytdlp = spawn(ytdlpBin, args, { 
-      shell: false,
-      // On Unix, if ytdlpBin contains ~, expand it
-      env: process.env
-    });
-    
-    let stdout = '';
-    let stderr = '';
-    
-    ytdlp.stdout?.on('data', (data) => {
-      stdout += data.toString();
-    });
-    
-    ytdlp.stderr?.on('data', (data) => {
-      stderr += data.toString();
-    });
-    
-    ytdlp.on('close', (code) => {
-      if (code !== 0) {
-        reject(new Error(`yt-dlp failed (code ${code}): ${stderr || 'Unknown error'}`));
-        return;
-      }
-      
-      if (!stdout.trim()) {
-        reject(new Error(`yt-dlp returned empty response. stderr: ${stderr}`));
-        return;
-      }
-      
-      try {
-        const info = JSON.parse(stdout);
-        resolve({
-          title: info.title || 'Unknown',
-          duration: info.duration || 0,
-          thumbnail: info.thumbnail,
-          url: info.webpage_url || info.url || input
-        });
-      } catch (e) {
-        reject(new Error(`Failed to parse yt-dlp output: ${stdout.substring(0, 200)}`));
-      }
-    });
-    
-    ytdlp.on('error', (err) => {
-      reject(new Error(`Failed to probe audio info: ${err.message}`));
-    });
-    
-    // Timeout after 30 seconds
-    setTimeout(() => {
-      ytdlp.kill();
-      reject(new Error('Timeout waiting for audio info'));
-    }, 30000);
-  });
-}
+// Backward-compatible explicit helper; source/platform resolution remains opt-in.
+export { probeAudioInfo } from './ytDlp';

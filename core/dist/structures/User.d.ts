@@ -5,6 +5,7 @@ import type { EmbedBuilder } from '../builders/EmbedBuilder';
  * Options for sending a DM message
  */
 export interface DMMessageOptions {
+    flags?: number;
     content?: string;
     embeds?: (APIEmbed | EmbedBuilder)[];
     components?: any[];

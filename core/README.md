@@ -117,6 +117,10 @@ GatewayIntentBits.MessageContent      // Message content access
 
 ## Builders
 
+### Components V2
+
+Text, sections, containers, galleries, thumbnails, file cards and separators can be combined with existing embeds and controls. See [Components V2](./COMPONENTS_V2.md) for builders, examples, protocol limits, deployment prerequisites.
+
 ### EmbedBuilder
 
 ```typescript
@@ -165,6 +169,48 @@ const command = new SlashCommandBuilder()
       .setRequired(true)
   );
 ```
+
+## Interaction updates, select menus and DMs
+
+`isSelectMenu()` recognizes string (3), user (5), role (6), mentionable (7) and channel (8) selects. `isStringSelectMenu()` only matches type 3. The original `componentType` and selected `values` are preserved.
+
+Buttons, selects and modals opened from a message support `update(options)` and `deferUpdate()`. A command-opened modal has no source message and must use `reply()` or `deferReply()`. Initial acknowledgement is allowed once, including `showModal()`.
+
+```typescript
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isModalSubmit() || !interaction.message) return;
+  await interaction.deferUpdate();
+  await interaction.editReply({ content: 'Saved', components: [] });
+});
+```
+
+Deploy message-service (the additive protobuf patch field) first, then apply community-service migrations `000059_interaction_message_ephemeral` and `000060_interaction_response_flags` and deploy community-service and the web client. Public message edits persist in storage; ephemeral source updates remain private and are sent through interaction events.
+
+`deferReply({ ephemeral: true })` fixes the visibility of the original reply. Subsequent `editReply()` calls use the interaction webhook and remain private; follow-ups choose their own visibility independently. The backend stores initial response flags so deferred private replies are never persisted as public messages. Apply migration `000060_interaction_response_flags` before deploying that backend change.
+
+This modal flow requires the accompanying backend and web client changes: the client sends the opening interaction ID and the server validates its user, application, channel, guild and expiration before associating the source message. Message edits preserve omitted fields; explicit empty arrays clear embeds/components.
+
+```typescript
+await user.send({ content: 'Hello', components: [row] });
+await dmChannel.send({ files: [{ name: 'hello.txt', data: Buffer.from('Hello') }] });
+await client.rest.createDMMessage(userId, { content: 'Hello' });
+await client.rest.createDMMessageToChannel(channelId, { content: 'Hello' });
+await client.rest.createDMMessageToChannelWithFile(channelId, {}, files);
+```
+
+`DMChannel.send()` always targets the channel; it does not require `recipientId`. Both `User.send()` and `followUp()` accept nested component builders without mutating caller-owned rows.
+
+String select options accept raw objects or `StringSelectMenuOptionBuilder`. Use `setDefault(true)` (wire field `option.default`); the web client applies defaults initially and on message edits. No extra menu-level `value/values` fields are needed.
+
+`EmbedBuilder.setFooter()` and `setAuthor()` accept both `iconURL` and `icon_url`. If both are supplied, `iconURL` takes precedence. Pass `null` to clear the footer/author.
+
+## REST rate limits and diagnostics
+
+JSON and buffered multipart requests share the same transport. HTTP 429 retries at most three times (four total attempts), respecting server `retry_after` seconds or `Retry-After` seconds/HTTP date. Global cooldowns apply to all routes on the REST instance; route cooldowns apply to the matching method and route. Multipart retries reuse the exact bytes and boundary. Other HTTP and network errors are surfaced without automatic retries.
+
+After retry exhaustion, `RateLimitError.retryAfter` is in milliseconds. REST request logs are disabled by default; set `DEBUG_REST=1` for diagnostics. Request diagnostics omit message bodies and redact interaction tokens.
+
+Run regression tests from `core/` with `npm test` (builds before running).
 
 ## Voice Support
 

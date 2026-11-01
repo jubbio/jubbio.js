@@ -7,3 +7,4 @@ export * from './SelectMenuBuilder';
 export * from './ActionRowBuilder';
 export * from './ModalBuilder';
 export * from './SlashCommandBuilder';
+export * from './ComponentsV2Builder';

@@ -45,6 +45,9 @@ export class Interaction {
   /** Whether the interaction has been deferred */
   public deferred = false;
 
+  /** Whether the initial reply is private. Follow-ups have independent visibility. */
+  public ephemeral: boolean | null = null;
+
   constructor(client: Client, data: APIInteraction) {
     this.client = client;
     // Handle both string and number IDs
@@ -121,14 +124,14 @@ export class Interaction {
    * Check if this is a select menu interaction
    */
   isSelectMenu(): this is SelectMenuInteraction {
-    return this.type === InteractionType.MessageComponent && (this as any).componentType === 3;
+    return this.type === InteractionType.MessageComponent && [3, 5, 6, 7, 8].includes((this as any).componentType);
   }
 
   /**
-   * Alias for isSelectMenu (Discord.js compatibility)
+   * Check specifically for a string select menu (component type 3)
    */
   isStringSelectMenu(): this is SelectMenuInteraction {
-    return this.isSelectMenu();
+    return this.type === InteractionType.MessageComponent && (this as any).componentType === 3;
   }
 
   /**
@@ -155,11 +158,12 @@ export class Interaction {
         content,
         embeds,
         components,
-        flags: ephemeral ? MessageFlags.Ephemeral : 0
+        flags: (typeof options === 'string' ? 0 : options.flags ?? 0) | (ephemeral ? MessageFlags.Ephemeral : 0)
       }
     });
     
     this.replied = true;
+    this.ephemeral = !!((typeof options === 'string' ? 0 : options.flags ?? 0) & MessageFlags.Ephemeral) || !!ephemeral;
   }
 
   /**
@@ -176,6 +180,7 @@ export class Interaction {
     });
     
     this.deferred = true;
+    this.ephemeral = options?.ephemeral ?? false;
   }
 
   /**
@@ -196,8 +201,9 @@ export class Interaction {
       content,
       embeds,
       components,
-      files
-    }, this.guildId, this.channelId, this.id);
+      files,
+      flags: this.ephemeral ? ((typeof options === 'string' ? 0 : options.flags ?? 0) | MessageFlags.Ephemeral) : (typeof options === 'string' ? undefined : options.flags)
+    }, this.ephemeral ? undefined : this.guildId, this.ephemeral ? undefined : this.channelId, this.ephemeral ? undefined : this.id);
   }
 
   /**
@@ -221,15 +227,13 @@ export class Interaction {
     const embeds = rawEmbeds?.map(e => e instanceof EmbedBuilder ? e.toJSON() : e);
     
     // Convert component builder instances to plain objects
-    const components = rawComponents?.map((c: any) =>
-      typeof c.toJSON === 'function' ? c.toJSON() : c
-    );
+    const components = serializeComponents(rawComponents);
     
     await this.client.rest.createFollowup(this.token, {
       content,
       embeds,
       components,
-      flags: ephemeral ? MessageFlags.Ephemeral : 0,
+      flags: (typeof options === 'string' ? 0 : options.flags ?? 0) | (ephemeral ? MessageFlags.Ephemeral : 0),
       files
     });
   }
@@ -415,136 +419,133 @@ export class AutocompleteInteraction extends Interaction {
   }
 }
 
-/**
- * Button interaction
- */
-export class ButtonInteraction extends Interaction {
-  /** Button custom ID */
-  public readonly customId: string;
-  
-  /** Component type (always 2 for buttons) */
-  public readonly componentType: number = 2;
-  
-  /** Message the button is attached to */
+/** Shared acknowledgement methods for interactions tied to a message. */
+abstract class MessageComponentInteraction extends Interaction {
+  private messageAcknowledged = false;
   public readonly message?: Message;
 
   constructor(client: Client, data: APIInteraction) {
     super(client, data);
-    this.customId = data.data?.custom_id || '';
-    // ponytail: wrap in Message structure so .delete()/.edit() work
-    // Inject guild_id from interaction since backend sends minimal message payload
     if (data.message) {
-      const messageData = { ...data.message, guild_id: data.guild_id };
-      this.message = new Message(client, messageData as any);
+      this.message = new Message(client, { ...data.message, guild_id: data.guild_id, channel_id: data.channel_id ?? data.message.channel_id } as any);
     }
   }
 
-  /**
-   * Update the message the button is attached to
-   */
+  private assertCanUpdate(): void {
+    if (this.replied || this.deferred) {
+      throw new Error('Interaction has already been replied to or deferred');
+    }
+    if (this.isModalSubmit() && !this.message) {
+      throw new Error('Only a modal opened from a message can update that message');
+    }
+  }
+
+  /** Update the message that triggered this interaction. */
   async update(options: string | InteractionReplyOptions): Promise<void> {
-    // ponytail: Bug #13 fix - string parametre desteği
-    const content = typeof options === 'string' ? options : options.content;
-    const rawEmbeds = typeof options === 'string' ? undefined : options.embeds;
-    const rawComponents = typeof options === 'string' ? undefined : options.components;
-    
-    // Convert EmbedBuilder instances to plain objects
-    const embeds = rawEmbeds?.map(e => e instanceof EmbedBuilder ? e.toJSON() : e);
-    // Convert ActionRowBuilder/ButtonBuilder instances to plain objects
-    const components = serializeComponents(rawComponents);
-    
+    this.assertCanUpdate();
+    const data = typeof options === 'string' ? { content: options } : options;
     await this.client.rest.createInteractionResponse(this.id, this.token, {
       type: InteractionResponseType.UpdateMessage,
       data: {
-        content,
-        embeds,
-        components
+        flags: data.flags,
+      content: data.content,
+        embeds: data.embeds?.map(e => e instanceof EmbedBuilder ? e.toJSON() : e),
+        components: serializeComponents(data.components)
       }
     });
     this.replied = true;
+    this.messageAcknowledged = true;
+  }
+
+  /** Edit the source message after update/deferUpdate, or the reply after reply/deferReply. */
+  async editReply(options: string | InteractionReplyOptions): Promise<void> {
+    if (!this.messageAcknowledged) return super.editReply(options);
+    const data = typeof options === 'string' ? { content: options } : options;
+    await this.client.rest.editInteractionResponse(this.token, {
+      flags: data.flags,
+      content: data.content,
+      embeds: data.embeds?.map(e => e instanceof EmbedBuilder ? e.toJSON() : e),
+      components: serializeComponents(data.components),
+      files: data.files
+    });
+  }
+
+  /** Acknowledge without showing a thinking message; editReply can update later. */
+  async deferUpdate(): Promise<void> {
+    this.assertCanUpdate();
+    await this.client.rest.createInteractionResponse(this.id, this.token, {
+      type: InteractionResponseType.DeferredUpdateMessage
+    });
+    this.deferred = true;
+    this.messageAcknowledged = true;
+  }
+}
+
+/** Button interaction. */
+export class ButtonInteraction extends MessageComponentInteraction {
+  /** Button custom ID */
+  public readonly customId: string;
+
+  /** Component type (always 2 for buttons) */
+  public readonly componentType: number = 2;
+
+  constructor(client: Client, data: APIInteraction) {
+    super(client, data);
+    this.customId = data.data?.custom_id || '';
   }
 
   /**
    * Show a modal in response to this button interaction
    */
   async showModal(modal: ModalData | { toJSON(): ModalData }): Promise<void> {
+    if (this.replied || this.deferred) throw new Error('Interaction has already been replied to or deferred');
     const modalData = 'toJSON' in modal && typeof modal.toJSON === 'function' ? modal.toJSON() : modal;
     await this.client.rest.createInteractionResponse(this.id, this.token, {
       type: InteractionResponseType.Modal,
       data: modalData
     });
+    this.replied = true;
   }
 }
 
 /**
  * Select menu interaction
  */
-export class SelectMenuInteraction extends Interaction {
+export class SelectMenuInteraction extends MessageComponentInteraction {
   /** Select menu custom ID */
   public readonly customId: string;
   
-  /** Component type (always 3 for select menus) */
-  public readonly componentType: number = 3;
+  /** Select component type (3, 5, 6, 7 or 8) */
+  public readonly componentType: number;
   
   /** Selected values */
   public readonly values: string[];
   
-  /** Message the select menu is attached to */
-  public readonly message?: Message;
-
   constructor(client: Client, data: APIInteraction) {
     super(client, data);
+    this.componentType = data.data?.component_type ?? 3;
     this.customId = data.data?.custom_id || '';
     this.values = data.data?.values || [];
-    // ponytail: wrap in Message structure so .delete()/.edit() work
-    // Inject guild_id from interaction since backend sends minimal message payload
-    if (data.message) {
-      const messageData = { ...data.message, guild_id: data.guild_id };
-      this.message = new Message(client, messageData as any);
-    }
-  }
-
-  /**
-   * Update the message the select menu is attached to
-   */
-  async update(options: string | InteractionReplyOptions): Promise<void> {
-    // ponytail: Bug #13 fix - string parametre desteği
-    const content = typeof options === 'string' ? options : options.content;
-    const rawEmbeds = typeof options === 'string' ? undefined : options.embeds;
-    const rawComponents = typeof options === 'string' ? undefined : options.components;
-    
-    // Convert EmbedBuilder instances to plain objects
-    const embeds = rawEmbeds?.map(e => e instanceof EmbedBuilder ? e.toJSON() : e);
-    // Convert ActionRowBuilder/ButtonBuilder instances to plain objects
-    const components = serializeComponents(rawComponents);
-    
-    await this.client.rest.createInteractionResponse(this.id, this.token, {
-      type: InteractionResponseType.UpdateMessage,
-      data: {
-        content,
-        embeds,
-        components
-      }
-    });
-    this.replied = true;
   }
 
   /**
    * Show a modal in response to this select menu interaction
    */
   async showModal(modal: ModalData | { toJSON(): ModalData }): Promise<void> {
+    if (this.replied || this.deferred) throw new Error('Interaction has already been replied to or deferred');
     const modalData = 'toJSON' in modal && typeof modal.toJSON === 'function' ? modal.toJSON() : modal;
     await this.client.rest.createInteractionResponse(this.id, this.token, {
       type: InteractionResponseType.Modal,
       data: modalData
     });
+    this.replied = true;
   }
 }
 
 /**
  * Modal submit interaction
  */
-export class ModalSubmitInteraction extends Interaction {
+export class ModalSubmitInteraction extends MessageComponentInteraction {
   /** Modal custom ID */
   public readonly customId: string;
   
@@ -603,6 +604,7 @@ export class ModalFields {
 
 // Types
 export interface InteractionReplyOptions {
+  flags?: number;
   content?: string;
   embeds?: (APIEmbed | EmbedBuilder)[];
   components?: any[];
@@ -633,10 +635,10 @@ export function createInteraction(client: Client, data: APIInteraction): Interac
     case InteractionType.ModalSubmit:
       return new ModalSubmitInteraction(client, data);
     case InteractionType.MessageComponent:
-      // component_type: 2 = Button, 3 = Select Menu
+      // Buttons and all supported select menu variants
       if (data.data?.component_type === 2) {
         return new ButtonInteraction(client, data);
-      } else if (data.data?.component_type === 3) {
+      } else if ([3, 5, 6, 7, 8].includes(data.data?.component_type ?? 0)) {
         return new SelectMenuInteraction(client, data);
       }
       return new Interaction(client, data);

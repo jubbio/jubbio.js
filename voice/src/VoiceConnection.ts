@@ -1,226 +1,201 @@
 import { EventEmitter } from 'events';
 import { Room, RoomEvent } from '@livekit/rtc-node';
 import { VoiceConnectionStatus } from './enums';
-import { 
-  JoinVoiceChannelOptions, 
-  VoiceConnectionState,
-  GatewayAdapterLibraryMethods,
-  VoiceServerUpdate
-} from './types';
-import { AudioPlayer } from './AudioPlayer';
+import { JoinVoiceChannelOptions, VoiceConnectionState, VoiceServerUpdate, VoiceStateUpdate, GatewayAdapterCreator } from './types';
+import type { AudioPlayer } from './AudioPlayer';
 
-/**
- * Represents a voice connection to a channel
- */
 export class VoiceConnection extends EventEmitter {
-  /** Current connection state */
   public state: VoiceConnectionState = { status: VoiceConnectionStatus.Connecting };
-  
-  /** The channel ID this connection is for */
-  public readonly channelId: string;
-  
-  /** The guild ID this connection is for */
+  public channelId: string;
   public readonly guildId: string;
-  
-  /** LiveKit room instance */
   private room: Room | null = null;
-  
-  /** LiveKit connection info */
-  private livekitEndpoint: string | null = null;
-  private livekitToken: string | null = null;
-  private livekitRoomName: string | null = null;
-  
-  /** Subscribed audio player */
   private subscribedPlayer: AudioPlayer | null = null;
-  
-  /** Gateway adapter methods */
-  private adapterMethods: GatewayAdapterLibraryMethods;
-  
-  /** Adapter implementer (for sending payloads) */
-  private adapter: { sendPayload: (payload: any) => boolean; destroy: () => void } | null = null;
+  private adapter: ReturnType<GatewayAdapterCreator>;
+  private generation = 0;
+  private connecting: Promise<void> = Promise.resolve();
+  private cancelConnecting: (() => void) | null = null;
+  private readonly selfMute: boolean;
+  private readonly selfDeaf: boolean;
 
   constructor(options: JoinVoiceChannelOptions) {
     super();
     this.channelId = options.channelId;
     this.guildId = options.guildId;
-    
-    // Create adapter methods that will receive gateway events
-    this.adapterMethods = {
-      onVoiceServerUpdate: (data: VoiceServerUpdate) => this.handleVoiceServerUpdate(data),
-      onVoiceStateUpdate: (data) => this.handleVoiceStateUpdate(data),
-      destroy: () => this.destroy()
-    };
-    
-    // Get adapter from creator
-    this.adapter = options.adapterCreator(this.adapterMethods);
-    
-    // Send voice state update to join channel
-    this.sendVoiceStateUpdate(options.channelId, options.selfMute, options.selfDeaf);
+    this.selfMute = options.selfMute ?? false;
+    this.selfDeaf = options.selfDeaf ?? false;
+    this.on('error', (error: Error) => {
+      if (this.listenerCount('error') === 1) console.error('[VoiceConnection]', error.message);
+    });
+    this.adapter = options.adapterCreator({
+      onVoiceServerUpdate: data => this.handleVoiceServerUpdate(data),
+      onVoiceStateUpdate: data => this.handleVoiceStateUpdate(data),
+      destroy: () => this.destroy(),
+    });
+    if (!this.sendVoiceStateUpdate(this.channelId)) this.setState(VoiceConnectionStatus.Disconnected);
   }
 
-  /**
-   * Subscribe an audio player to this connection
-   */
   subscribe(player: AudioPlayer): void {
-    if (this.subscribedPlayer) {
-      this.subscribedPlayer.unsubscribe(this);
-    }
+    if (this.subscribedPlayer === player) return;
+    this.unsubscribe();
     this.subscribedPlayer = player;
     player.subscribe(this);
   }
 
-  /**
-   * Unsubscribe the current audio player
-   */
   unsubscribe(): void {
-    if (this.subscribedPlayer) {
-      this.subscribedPlayer.unsubscribe(this);
-      this.subscribedPlayer = null;
-    }
+    this.subscribedPlayer?.unsubscribe(this);
+    this.subscribedPlayer = null;
   }
 
-  /**
-   * Get the LiveKit room (for audio player to publish tracks)
-   */
   getRoom(): Room | null {
-    return this.room;
+    return this.state.status === VoiceConnectionStatus.Ready ? this.room : null;
   }
 
-  /**
-   * Disconnect from the voice channel
-   */
   disconnect(): boolean {
-    this.sendVoiceStateUpdate(null);
-    return true;
+    if (this.state.status === VoiceConnectionStatus.Destroyed) return false;
+    const sent = this.sendVoiceStateUpdate(null);
+    this.generation++;
+    this.releaseRoom();
+    this.setState(VoiceConnectionStatus.Disconnected);
+    return sent;
   }
 
-  /**
-   * Destroy the connection completely
-   */
-  destroy(): void {
+  destroy(sendLeave = true): void {
+    if (this.state.status === VoiceConnectionStatus.Destroyed) return;
+    this.generation++;
+    if (sendLeave) this.sendVoiceStateUpdate(null);
+    this.releaseRoom();
     this.unsubscribe();
-    this.disconnectFromLiveKit();
+    this.setState(VoiceConnectionStatus.Destroyed);
     this.adapter?.destroy();
-    this.setState({ status: VoiceConnectionStatus.Destroyed });
   }
 
-  /**
-   * Rejoin the voice channel (after disconnect)
-   */
   rejoin(): boolean {
-    this.sendVoiceStateUpdate(this.channelId);
-    return true;
+    if (this.state.status === VoiceConnectionStatus.Destroyed) return false;
+    const sent = this.sendVoiceStateUpdate(this.channelId);
+    if (sent) this.setState(VoiceConnectionStatus.Connecting);
+    return sent;
   }
 
-  private sendVoiceStateUpdate(channelId: string | null, selfMute = false, selfDeaf = false): void {
-    if (!this.adapter) return;
-    
-    this.adapter.sendPayload({
-      op: 4, // VOICE_STATE_UPDATE
-      d: {
-        guild_id: this.guildId,
-        channel_id: channelId,
-        self_mute: selfMute,
-        self_deaf: selfDeaf
-      }
-    });
+  private sendVoiceStateUpdate(channelId: string | null): boolean {
+    return this.adapter?.sendPayload({
+      op: 4,
+      d: { guild_id: this.guildId, channel_id: channelId, self_mute: this.selfMute, self_deaf: this.selfDeaf },
+    }) ?? false;
   }
 
   private handleVoiceServerUpdate(data: VoiceServerUpdate): void {
-    this.livekitEndpoint = data.endpoint;
-    this.livekitToken = data.token;
-    this.livekitRoomName = data.room;
-    
-    this.setState({ status: VoiceConnectionStatus.Signalling });
-    this.connectToLiveKit();
-  }
-
-  private handleVoiceStateUpdate(data: any): void {
-    if (data.channel_id === null) {
-      // Disconnected
-      this.disconnectFromLiveKit();
-      this.setState({ status: VoiceConnectionStatus.Disconnected });
-    }
-  }
-
-  private async connectToLiveKit(): Promise<void> {
-    if (!this.livekitEndpoint || !this.livekitToken) {
-      this.emit('error', new Error('Missing LiveKit connection info'));
-      return;
-    }
-
-    try {
-      // Disconnect existing room if any
-      await this.disconnectFromLiveKit();
-      
-      this.room = new Room();
-      
-      this.room.on(RoomEvent.Disconnected, () => {
-        this.setState({ status: VoiceConnectionStatus.Disconnected });
+    if (this.state.status === VoiceConnectionStatus.Destroyed) return;
+    const generation = ++this.generation;
+    this.releaseRoom();
+    this.setState(VoiceConnectionStatus.Signalling);
+    // Serialize native connects. A late result can only close its own room.
+    this.connecting = this.connecting.then(async () => {
+      if (generation !== this.generation) return;
+      if (!data.endpoint || !data.token) {
+        this.setState(VoiceConnectionStatus.Disconnected);
+        this.emit('error', new Error('Missing LiveKit connection info'));
+        return;
+      }
+      const room = new Room();
+      this.room = room;
+      const isCurrent = () => generation === this.generation && this.room === room;
+      room.on(RoomEvent.Disconnected, () => {
+        if (!isCurrent()) return;
+        this.subscribedPlayer?.onConnectionDisconnected(this);
+        this.setState(VoiceConnectionStatus.Disconnected);
       });
-
-      await this.room.connect(this.livekitEndpoint, this.livekitToken);
-      
-      this.setState({ status: VoiceConnectionStatus.Ready });
-      
-      // Notify subscribed player that connection is ready
-      if (this.subscribedPlayer) {
-        this.subscribedPlayer.onConnectionReady(this);
-      }
-    } catch (error) {
-      this.emit('error', error);
-      this.setState({ status: VoiceConnectionStatus.Disconnected });
-    }
-  }
-
-  private async disconnectFromLiveKit(): Promise<void> {
-    if (this.room) {
+      room.on(RoomEvent.Reconnecting, () => {
+        if (!isCurrent()) return;
+        this.subscribedPlayer?.onConnectionDisconnected(this);
+        this.setState(VoiceConnectionStatus.Connecting);
+      });
+      room.on(RoomEvent.Reconnected, () => {
+        if (!isCurrent()) return;
+        this.setState(VoiceConnectionStatus.Ready);
+        this.subscribedPlayer?.onConnectionReady(this);
+      });
+      let cancel!: () => void;
+      const cancelled = new Promise<void>(resolve => { cancel = resolve; });
+      this.cancelConnecting = cancel;
+      let timeout: NodeJS.Timeout | undefined;
+      const timedOut = new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(() => reject(new Error('Timeout connecting to LiveKit')), 15000);
+        timeout.unref();
+      });
       try {
-        await this.room.disconnect();
-      } catch (e) {
-        // Ignore disconnect errors
+        const connected = room.connect(data.endpoint, data.token).then(async () => {
+          if (!isCurrent()) await room.disconnect();
+        });
+        await Promise.race([connected, cancelled, timedOut]);
+        if (!isCurrent()) return;
+        this.setState(VoiceConnectionStatus.Ready);
+        this.subscribedPlayer?.onConnectionReady(this);
+      } catch (error) {
+        if (!isCurrent()) return;
+        this.releaseRoom();
+        this.setState(VoiceConnectionStatus.Disconnected);
+        this.emit('error', error);
+      } finally {
+        clearTimeout(timeout);
+        if (this.cancelConnecting === cancel) this.cancelConnecting = null;
       }
-      this.room = null;
+    }).catch(error => {
+      if (generation === this.generation) this.emit('error', error);
+    });
+  }
+
+  // Core adapters forward only this bot's voice state, never other members' events.
+  private handleVoiceStateUpdate(data: VoiceStateUpdate): void {
+    if (this.state.status === VoiceConnectionStatus.Destroyed || String(data.guild_id) !== this.guildId) return;
+    if (data.channel_id === null) {
+      this.generation++;
+      this.releaseRoom();
+      this.setState(VoiceConnectionStatus.Disconnected);
+    } else {
+      this.channelId = String(data.channel_id);
     }
   }
 
-  private setState(newState: VoiceConnectionState): void {
-    const oldState = this.state;
-    this.state = newState;
-    this.emit('stateChange', oldState, newState);
+  private releaseRoom(): void {
+    this.cancelConnecting?.();
+    this.cancelConnecting = null;
+    const room = this.room;
+    this.room = null;
+    if (!room) return;
+    this.subscribedPlayer?.onConnectionDisconnected(this);
+    room.removeAllListeners();
+    void room.disconnect().catch(() => {});
+  }
+
+  private setState(status: VoiceConnectionStatus): void {
+    if (this.state.status === status) return;
+    const previous = this.state;
+    this.state = { status };
+    this.emit('stateChange', previous, this.state);
   }
 }
 
-// Store active connections
-const connections = new Map<string, VoiceConnection>();
+// Connections are scoped to their adapter creator (bot client) and guild.
+const connections = new Map<string, Map<GatewayAdapterCreator, VoiceConnection>>();
 
-/**
- * Join a voice channel - main entry point
- */
 export function joinVoiceChannel(options: JoinVoiceChannelOptions): VoiceConnection {
-  const key = `${options.guildId}:${options.channelId}`;
-  
-  // Destroy existing connection if any
-  const existing = connections.get(key);
-  if (existing) {
-    existing.destroy();
-    connections.delete(key);
-  }
-  
+  let guildConnections = connections.get(options.guildId);
+  // The new join moves the bot. Sending a separate leave would deliver a stale null
+  // voice state to the replacement adapter while it is already connecting.
+  guildConnections?.get(options.adapterCreator)?.destroy(false);
+  guildConnections = connections.get(options.guildId) ?? new Map();
+  connections.set(options.guildId, guildConnections);
   const connection = new VoiceConnection(options);
-  connections.set(key, connection);
-  
+  guildConnections.set(options.adapterCreator, connection);
+  connection.on('stateChange', (_old: VoiceConnectionState, state: VoiceConnectionState) => {
+    if (state.status !== VoiceConnectionStatus.Destroyed) return;
+    if (guildConnections.get(options.adapterCreator) === connection) guildConnections.delete(options.adapterCreator);
+    if (guildConnections.size === 0) connections.delete(options.guildId);
+  });
   return connection;
 }
 
-/**
- * Get an existing voice connection
- */
-export function getVoiceConnection(guildId: string): VoiceConnection | undefined {
-  for (const [key, connection] of connections) {
-    if (key.startsWith(`${guildId}:`)) {
-      return connection;
-    }
-  }
-  return undefined;
+export function getVoiceConnection(guildId: string, adapterCreator?: GatewayAdapterCreator): VoiceConnection | undefined {
+  const guildConnections = connections.get(guildId);
+  return adapterCreator ? guildConnections?.get(adapterCreator) : guildConnections?.values().next().value;
 }

@@ -2,8 +2,8 @@
  * ActionRowBuilder for creating component rows
  */
 import { APIButtonComponent } from './ButtonBuilder';
-import { APISelectMenuComponent } from './SelectMenuBuilder';
-export type APIActionRowComponent = APIButtonComponent | APISelectMenuComponent;
+import { APISelectMenuComponent, APIAutoSelectMenuComponent } from './SelectMenuBuilder';
+export type APIActionRowComponent = APIButtonComponent | APISelectMenuComponent | APIAutoSelectMenuComponent;
 export interface APIActionRow {
     type: 1;
     components: APIActionRowComponent[];

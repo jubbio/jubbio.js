@@ -34,11 +34,6 @@ export declare class REST {
     private readonly USER_CACHE_TTL;
     constructor(baseUrl?: string);
     /**
-     * Redact sensitive data from objects/strings for safe logging.
-     * Masks fields named 'token', 'authorization', 'password', 'secret', 'api_key' with '[REDACTED]'
-     */
-    private redactSensitiveData;
-    /**
      * Cache a user for mention resolution
      * Bot'lar interaction'dan gelen user bilgisini cache'leyebilir
      */
@@ -98,7 +93,11 @@ export declare class REST {
     /**
      * Make an authenticated request with rate limit retry
      */
+    private globalResetAt;
+    private readonly routeResetAt;
     private request;
+    /** Shared transport; JSON and buffered multipart bodies are replayable on HTTP 429. */
+    private requestBody;
     /**
      * Create a message in a channel
      * Mentions use <@ID> format and are kept as-is (client renders them)
@@ -112,6 +111,7 @@ export declare class REST {
         content?: string;
         embeds?: APIEmbed[];
         components?: any[];
+        flags?: number;
         mentions?: MentionsData;
         files?: Array<{
             name: string;
@@ -121,11 +121,11 @@ export declare class REST {
             message_id: string;
         };
         interactionId?: string;
-        flags?: number;
     }, data?: {
         content?: string;
         embeds?: APIEmbed[];
         components?: any[];
+        flags?: number;
         mentions?: MentionsData;
         files?: Array<{
             name: string;
@@ -135,7 +135,6 @@ export declare class REST {
             message_id: string;
         };
         interactionId?: string;
-        flags?: number;
     }): Promise<APIMessage>;
     /**
      * Create an ephemeral message that is only visible to a specific user
@@ -151,6 +150,7 @@ export declare class REST {
         content?: string;
         embeds?: APIEmbed[];
         components?: any[];
+        flags?: number;
     }): Promise<{
         id: string;
         ephemeral: boolean;
@@ -167,6 +167,7 @@ export declare class REST {
         content?: string;
         embeds?: APIEmbed[];
         components?: any[];
+        flags?: number;
     }): Promise<APIMessage>;
     /**
      * Create a DM message to an existing DM channel
@@ -176,20 +177,34 @@ export declare class REST {
         content?: string;
         embeds?: APIEmbed[];
         components?: any[];
+        flags?: number;
     }): Promise<APIMessage>;
     /**
      * Create a DM message with file attachment
-     * ponytail: DM için file + embed desteği
+     * DM için file + embed desteği
      */
     createDMMessageWithFile(userId: string, data: {
         content?: string;
         embeds?: APIEmbed[];
+        components?: any[];
+        flags?: number;
+    }, files: Array<{
+        name: string;
+        data: Buffer | string;
+        contentType?: string;
+    }>): Promise<APIMessage>;
+    /** Send attachments to an existing DM channel without requiring a recipient ID. */
+    createDMMessageToChannelWithFile(channelId: string, data: {
+        content?: string;
+        embeds?: APIEmbed[];
+        flags?: number;
         components?: any[];
     }, files: Array<{
         name: string;
         data: Buffer | string;
         contentType?: string;
     }>): Promise<APIMessage>;
+    private sendDMFiles;
     /**
      * Edit a message
      * Automatically processes mentions
@@ -198,6 +213,7 @@ export declare class REST {
         content?: string;
         embeds?: APIEmbed[];
         components?: any[];
+        flags?: number;
         mentions?: MentionsData;
     }): Promise<APIMessage>;
     /**
@@ -247,12 +263,13 @@ export declare class REST {
     }>;
     /**
      * Create a message with a file attachment
-     * ponytail: embeds ve components desteği eklendi
+     * embeds ve components desteği eklendi
      */
     createMessageWithFile(guildId: string, channelId: string, data: {
         content?: string;
         embeds?: APIEmbed[];
         components?: any[];
+        flags?: number;
         file: {
             name: string;
             data: Buffer;
@@ -277,6 +294,7 @@ export declare class REST {
         content?: string;
         embeds?: APIEmbed[];
         components?: any[];
+        flags?: number;
         mentions?: MentionsData;
         files?: Array<{
             name: string;
@@ -297,8 +315,8 @@ export declare class REST {
         content?: string;
         embeds?: APIEmbed[];
         components?: any[];
-        mentions?: MentionsData;
         flags?: number;
+        mentions?: MentionsData;
         files?: Array<{
             name: string;
             data: Buffer;

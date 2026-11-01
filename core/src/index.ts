@@ -90,6 +90,7 @@ export {
   SelectMenuType,
   type APISelectMenuOption,
   type APISelectMenuComponent,
+  type APIAutoSelectMenuComponent,
 } from './builders/SelectMenuBuilder';
 
 export { 
@@ -173,3 +174,4 @@ export {
   ShardStatus,
   type ShardingManagerOptions,
 } from './sharding/ShardingManager';
+export * from './builders/ComponentsV2Builder';

@@ -10,6 +10,7 @@
     "LICENSE"
   ],
   "scripts": {
+    "test": "node --test test/*.test.cjs",
     "build": "tsc",
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build"
@@ -42,11 +43,11 @@
     }
   },
   "dependencies": {
-    "@livekit/rtc-node": "^0.12.1"
+    "@livekit/rtc-node": "1.2.1"
   },
   "devDependencies": {
-    "typescript": "^5.0.0",
-    "@types/node": "^20.0.0"
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
   },
   "engines": {
     "node": ">=18.0.0"

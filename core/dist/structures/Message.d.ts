@@ -100,7 +100,7 @@ export declare class Message {
     constructor(client: Client, data: APIMessage);
     /**
      * The channel this message was sent in
-     * ponytail: refactored - artık TextChannel instance döndürüyor, DRY
+     * refactored - artık TextChannel instance döndürüyor, DRY
      * Caches the TextChannel instance for performance
      */
     get channel(): TextChannel;
@@ -119,7 +119,7 @@ export declare class Message {
     get editedAt(): Date | null;
     /**
      * Reply to this message
-     * ponytail: Bug #8 fix - embed tekil, Bug #10 fix - flags desteği
+     * Bug #8 fix - embed tekil, Bug #10 fix - flags desteği
      */
     reply(options: string | MessageCreateOptions): Promise<Message>;
     /**

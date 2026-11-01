@@ -1,4 +1,5 @@
 import { APIUser, APIEmbed } from '../types';
+import { serializeComponents } from '../utils/serialize';
 import type { Client } from '../Client';
 import type { EmbedBuilder } from '../builders/EmbedBuilder';
 
@@ -6,6 +7,7 @@ import type { EmbedBuilder } from '../builders/EmbedBuilder';
  * Options for sending a DM message
  */
 export interface DMMessageOptions {
+  flags?: number;
   content?: string;
   embeds?: (APIEmbed | EmbedBuilder)[];
   components?: any[];
@@ -100,6 +102,7 @@ export class User {
     const content = typeof options === 'string' ? options : options.content;
     const rawEmbeds = typeof options === 'string' ? undefined : options.embeds;
     const rawComponents = typeof options === 'string' ? undefined : options.components;
+    const flags = typeof options === 'string' ? undefined : options.flags;
     const files = typeof options === 'string' ? undefined : options.files;
     
     // Convert EmbedBuilder instances to plain objects
@@ -108,15 +111,13 @@ export class User {
     );
 
     // Convert component builder instances to plain objects
-    const components = rawComponents?.map(c =>
-      typeof (c as any).toJSON === 'function' ? (c as any).toJSON() : c
-    );
+    const components = serializeComponents(rawComponents);
 
-    // ponytail: use createDMMessageWithFile for file uploads, createDMMessage otherwise
+    // use createDMMessageWithFile for file uploads, createDMMessage otherwise
     if (files && files.length > 0) {
-      return this.client.rest.createDMMessageWithFile(this.id, { content, embeds, components }, files);
+      return this.client.rest.createDMMessageWithFile(this.id, { content, embeds, components, flags }, files);
     }
 
-    return this.client.rest.createDMMessage(this.id, { content, embeds, components });
+    return this.client.rest.createDMMessage(this.id, { content, embeds, components, flags });
   }
 }

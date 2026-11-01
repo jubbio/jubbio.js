@@ -117,7 +117,30 @@ export declare enum MessageFlags {
     Urgent = 16,
     Ephemeral = 64,
     Loading = 128,
-    SuppressNotifications = 4096
+    SuppressNotifications = 4096,
+    IsComponentsV2 = 32768
+}
+/** Message component wire types. */
+export declare enum ComponentType {
+    ActionRow = 1,
+    Button = 2,
+    StringSelect = 3,
+    TextInput = 4,
+    UserSelect = 5,
+    RoleSelect = 6,
+    MentionableSelect = 7,
+    ChannelSelect = 8,
+    Section = 9,
+    TextDisplay = 10,
+    Thumbnail = 11,
+    MediaGallery = 12,
+    File = 13,
+    Separator = 14,
+    Container = 17
+}
+export declare enum SeparatorSpacingSize {
+    Small = 1,
+    Large = 2
 }
 /**
  * Activity Types

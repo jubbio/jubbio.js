@@ -1,6 +1,6 @@
 /**
  * Embed - Read-only embed wrapper with toBuilder() support
- * ponytail: message.embeds[0].toBuilder() ergonomisi için
+ * message.embeds[0].toBuilder() ergonomisi için
  */
 
 import { EmbedBuilder, APIEmbed, APIEmbedField, APIEmbedAuthor, APIEmbedFooter, APIEmbedImage, APIEmbedThumbnail } from '../builders/EmbedBuilder';

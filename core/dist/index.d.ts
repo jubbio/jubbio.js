@@ -20,7 +20,7 @@ export { BaseChannel, TextChannel, VoiceChannel, DMChannel, createChannel, type 
 export { Collector, MessageCollector, InteractionCollector, ReactionCollector, awaitMessages, awaitReactions, type CollectorOptions, type MessageCollectorOptions, type InteractionCollectorOptions, type ReactionCollectorOptions, } from './utils/Collector';
 export { EmbedBuilder, Colors, type APIEmbed, type APIEmbedField, type APIEmbedAuthor, type APIEmbedFooter, type APIEmbedImage, type APIEmbedThumbnail, } from './builders/EmbedBuilder';
 export { ButtonBuilder, ButtonStyle, type APIButtonComponent, } from './builders/ButtonBuilder';
-export { StringSelectMenuBuilder, SelectMenuBuilder, StringSelectMenuOptionBuilder, UserSelectMenuBuilder, RoleSelectMenuBuilder, MentionableSelectMenuBuilder, ChannelSelectMenuBuilder, SelectMenuType, type APISelectMenuOption, type APISelectMenuComponent, } from './builders/SelectMenuBuilder';
+export { StringSelectMenuBuilder, SelectMenuBuilder, StringSelectMenuOptionBuilder, UserSelectMenuBuilder, RoleSelectMenuBuilder, MentionableSelectMenuBuilder, ChannelSelectMenuBuilder, SelectMenuType, type APISelectMenuOption, type APISelectMenuComponent, type APIAutoSelectMenuComponent, } from './builders/SelectMenuBuilder';
 export { ActionRowBuilder, type APIActionRow, type APIActionRowComponent, } from './builders/ActionRowBuilder';
 export { ModalBuilder, TextInputBuilder, TextInputStyle, type APITextInputComponent, type APIModalActionRow, type APIModal, } from './builders/ModalBuilder';
 export { SlashCommandBuilder, SlashCommandStringOption, SlashCommandIntegerOption, SlashCommandNumberOption, SlashCommandBooleanOption, SlashCommandUserOption, SlashCommandChannelOption, SlashCommandRoleOption, SlashCommandMentionableOption, SlashCommandAttachmentOption, SlashCommandSubcommandBuilder, SlashCommandSubcommandGroupBuilder, ApplicationCommandOptionType as SlashCommandOptionType, } from './builders/SlashCommandBuilder';
@@ -29,3 +29,4 @@ export { BitField, type BitFieldResolvable } from './utils/BitField';
 export { PermissionsBitField, type PermissionString, type PermissionResolvable } from './utils/PermissionsBitField';
 export { unicodeToShortcode, normalizeEmoji, isUnicodeEmoji, isShortcode, isCustomEmoji, } from './utils/emojiUtils';
 export { ShardingManager, Shard, ShardClientUtil, ShardStatus, type ShardingManagerOptions, } from './sharding/ShardingManager';
+export * from './builders/ComponentsV2Builder';

@@ -3,9 +3,9 @@
  */
 
 import { APIButtonComponent } from './ButtonBuilder';
-import { APISelectMenuComponent } from './SelectMenuBuilder';
+import { APISelectMenuComponent, APIAutoSelectMenuComponent } from './SelectMenuBuilder';
 
-export type APIActionRowComponent = APIButtonComponent | APISelectMenuComponent;
+export type APIActionRowComponent = APIButtonComponent | APISelectMenuComponent | APIAutoSelectMenuComponent;
 
 export interface APIActionRow {
   type: 1;
@@ -25,7 +25,7 @@ const COMPONENT_TYPE = {
 
 /** Check if a component type is a select menu */
 function isSelectMenu(type: number): boolean {
-  return type >= COMPONENT_TYPE.STRING_SELECT && type !== COMPONENT_TYPE.TEXT_INPUT;
+  return [3, 5, 6, 7, 8].includes(type);
 }
 
 /**

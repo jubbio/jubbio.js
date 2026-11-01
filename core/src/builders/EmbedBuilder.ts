@@ -77,7 +77,7 @@ export class EmbedBuilder {
       this.data.fields = [...data.fields];
     }
     
-    // ponytail: Apply global defaults on construction
+    // Apply global defaults on construction
     if (globalDefaults.color !== undefined && this.data.color === undefined) {
       this.data.color = globalDefaults.color;
     }
@@ -258,11 +258,11 @@ export class EmbedBuilder {
     } else if (typeof color === 'number') {
       this.data.color = color;
     } else if (typeof color === 'string') {
-      // ponytail: 'Random' support
+      // 'Random' support
       if (color === 'Random') {
         this.data.color = Math.floor(Math.random() * 0xffffff);
       } else {
-        // ponytail: Bug #6 fix - Colors lookup for string names like 'Red', 'Green'
+        // Bug #6 fix - Colors lookup for string names like 'Red', 'Green'
         const colorName = color as keyof typeof Colors;
         if (Colors[colorName] !== undefined) {
           this.data.color = Colors[colorName];
@@ -280,13 +280,13 @@ export class EmbedBuilder {
    * Sets the footer of this embed
    * @param options The footer options
    */
-  setFooter(options: { text: string; iconURL?: string } | null): this {
+  setFooter(options: { text: string; iconURL?: string; icon_url?: string } | null): this {
     if (options === null) {
       this.data.footer = undefined;
     } else {
       this.data.footer = {
         text: options.text,
-        icon_url: options.iconURL,
+        icon_url: options.iconURL ?? options.icon_url,
       };
     }
     return this;
@@ -326,13 +326,13 @@ export class EmbedBuilder {
    * Sets the author of this embed
    * @param options The author options
    */
-  setAuthor(options: { name: string; iconURL?: string; url?: string } | null): this {
+  setAuthor(options: { name: string; iconURL?: string; icon_url?: string; url?: string } | null): this {
     if (options === null) {
       this.data.author = undefined;
     } else {
       this.data.author = {
         name: options.name,
-        icon_url: options.iconURL,
+        icon_url: options.iconURL ?? options.icon_url,
         url: options.url,
       };
     }
@@ -400,7 +400,7 @@ export class EmbedBuilder {
 
   /**
    * Returns the JSON representation of this embed
-   * ponytail: Bug #7 fix - fields deep copy yapılır
+   * Bug #7 fix - fields deep copy yapılır
    */
   toJSON(): APIEmbed {
     return {

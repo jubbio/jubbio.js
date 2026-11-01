@@ -31,6 +31,8 @@ export declare class Interaction {
     replied: boolean;
     /** Whether the interaction has been deferred */
     deferred: boolean;
+    /** Whether the initial reply is private. Follow-ups have independent visibility. */
+    ephemeral: boolean | null;
     constructor(client: Client, data: APIInteraction);
     /**
      * The guild this interaction was sent in (if in a guild)
@@ -58,7 +60,7 @@ export declare class Interaction {
      */
     isSelectMenu(): this is SelectMenuInteraction;
     /**
-     * Alias for isSelectMenu (Discord.js compatibility)
+     * Check specifically for a string select menu (component type 3)
      */
     isStringSelectMenu(): this is SelectMenuInteraction;
     /**
@@ -171,21 +173,26 @@ export declare class AutocompleteInteraction extends Interaction {
      */
     respond(choices: AutocompleteChoice[]): Promise<void>;
 }
-/**
- * Button interaction
- */
-export declare class ButtonInteraction extends Interaction {
+/** Shared acknowledgement methods for interactions tied to a message. */
+declare abstract class MessageComponentInteraction extends Interaction {
+    private messageAcknowledged;
+    readonly message?: Message;
+    constructor(client: Client, data: APIInteraction);
+    private assertCanUpdate;
+    /** Update the message that triggered this interaction. */
+    update(options: string | InteractionReplyOptions): Promise<void>;
+    /** Edit the source message after update/deferUpdate, or the reply after reply/deferReply. */
+    editReply(options: string | InteractionReplyOptions): Promise<void>;
+    /** Acknowledge without showing a thinking message; editReply can update later. */
+    deferUpdate(): Promise<void>;
+}
+/** Button interaction. */
+export declare class ButtonInteraction extends MessageComponentInteraction {
     /** Button custom ID */
     readonly customId: string;
     /** Component type (always 2 for buttons) */
     readonly componentType: number;
-    /** Message the button is attached to */
-    readonly message?: Message;
     constructor(client: Client, data: APIInteraction);
-    /**
-     * Update the message the button is attached to
-     */
-    update(options: string | InteractionReplyOptions): Promise<void>;
     /**
      * Show a modal in response to this button interaction
      */
@@ -196,20 +203,14 @@ export declare class ButtonInteraction extends Interaction {
 /**
  * Select menu interaction
  */
-export declare class SelectMenuInteraction extends Interaction {
+export declare class SelectMenuInteraction extends MessageComponentInteraction {
     /** Select menu custom ID */
     readonly customId: string;
-    /** Component type (always 3 for select menus) */
+    /** Select component type (3, 5, 6, 7 or 8) */
     readonly componentType: number;
     /** Selected values */
     readonly values: string[];
-    /** Message the select menu is attached to */
-    readonly message?: Message;
     constructor(client: Client, data: APIInteraction);
-    /**
-     * Update the message the select menu is attached to
-     */
-    update(options: string | InteractionReplyOptions): Promise<void>;
     /**
      * Show a modal in response to this select menu interaction
      */
@@ -220,7 +221,7 @@ export declare class SelectMenuInteraction extends Interaction {
 /**
  * Modal submit interaction
  */
-export declare class ModalSubmitInteraction extends Interaction {
+export declare class ModalSubmitInteraction extends MessageComponentInteraction {
     /** Modal custom ID */
     readonly customId: string;
     /** Modal fields */
@@ -245,6 +246,7 @@ export declare class ModalFields {
     } | null;
 }
 export interface InteractionReplyOptions {
+    flags?: number;
     content?: string;
     embeds?: (APIEmbed | EmbedBuilder)[];
     components?: any[];
@@ -268,3 +270,4 @@ export interface ModalData {
  * Create appropriate interaction class based on type
  */
 export declare function createInteraction(client: Client, data: APIInteraction): Interaction;
+export {};

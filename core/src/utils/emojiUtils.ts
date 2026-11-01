@@ -1,6 +1,6 @@
 /**
  * Emoji utilities for converting between unicode and shortcode formats
- * ponytail: Backend only accepts :shortcode: format, not unicode characters
+ * Backend only accepts :shortcode: format, not unicode characters
  */
 
 import shortcodes from './emojiShortcodes.json';

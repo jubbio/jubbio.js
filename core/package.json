@@ -7,9 +7,11 @@
   "files": [
     "dist",
     "README.md",
+    "COMPONENTS_V2.md",
     "LICENSE"
   ],
   "scripts": {
+    "test": "npm run build && node --test test/*.test.cjs",
     "build": "tsc",
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build"

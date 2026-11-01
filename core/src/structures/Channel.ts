@@ -131,11 +131,11 @@ export class TextChannel extends BaseChannel {
 
   /**
    * Send a message to this channel
-   * ponytail: Bug #8 fix - embed tekil kullanımı, Bug #10 fix - flags desteği
+   * Bug #8 fix - embed tekil kullanımı, Bug #10 fix - flags desteği
    */
   async send(options: string | MessageCreateOptions): Promise<Message> {
     const content = typeof options === 'string' ? options : options.content;
-    // ponytail: Bug #8 fix - embed tekil kullanımı desteklenir
+    // Bug #8 fix - embed tekil kullanımı desteklenir
     const rawEmbeds = typeof options === 'string' 
       ? undefined 
       : (options.embeds || (options.embed ? [options.embed] : undefined));
@@ -151,7 +151,8 @@ export class TextChannel extends BaseChannel {
         content,
         embeds,
         components,
-        file
+        file,
+        flags
       });
       return new Message(this.client, data);
     }
@@ -306,15 +307,18 @@ export class DMChannel extends BaseChannel {
    * Send a message to this DM
    */
   async send(options: string | MessageCreateOptions): Promise<Message> {
-    const content = typeof options === 'string' ? options : options.content;
-    const embeds = typeof options === 'string' ? undefined : resolveEmbeds(options.embeds);
-    
-    const data = await this.client.rest.createDMMessage(this.id, {
-      content,
-      embeds
-    });
-    
-    return new Message(this.client, data);
+    const data = typeof options === 'string' ? { content: options } : {
+      content: options.content,
+      embeds: resolveEmbeds(options.embeds ?? (options.embed ? [options.embed] : undefined)),
+      flags: options.flags,
+      components: options.components
+    };
+    const files = typeof options === 'string' ? undefined : options.files;
+    const message = files?.length
+      ? await this.client.rest.createDMMessageToChannelWithFile(this.id, data, files)
+      : await this.client.rest.createDMMessageToChannel(this.id, data);
+
+    return new Message(this.client, message);
   }
 }
 
@@ -324,10 +328,10 @@ export class DMChannel extends BaseChannel {
 export interface MessageCreateOptions {
   content?: string;
   embeds?: (APIEmbed | EmbedBuilder)[];
-  embed?: APIEmbed | EmbedBuilder;  // ponytail: Bug #8 - tekil embed desteği
+  embed?: APIEmbed | EmbedBuilder;  // Bug #8 - tekil embed desteği
   components?: any[];
   files?: any[];
-  flags?: number;  // ponytail: Bug #10 - flags desteği (MessageFlags.SuppressEmbeds vb.)
+  flags?: number;  // Bug #10 - flags desteği (MessageFlags.SuppressEmbeds vb.)
 }
 
 /**

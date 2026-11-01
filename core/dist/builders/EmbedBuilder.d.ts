@@ -124,6 +124,7 @@ export declare class EmbedBuilder {
     setFooter(options: {
         text: string;
         iconURL?: string;
+        icon_url?: string;
     } | null): this;
     /**
      * Sets the image of this embed
@@ -150,6 +151,7 @@ export declare class EmbedBuilder {
     setAuthor(options: {
         name: string;
         iconURL?: string;
+        icon_url?: string;
         url?: string;
     } | null): this;
     /**
@@ -175,7 +177,7 @@ export declare class EmbedBuilder {
     clearFields(): this;
     /**
      * Returns the JSON representation of this embed
-     * ponytail: Bug #7 fix - fields deep copy yapılır
+     * Bug #7 fix - fields deep copy yapılır
      */
     toJSON(): APIEmbed;
     /**

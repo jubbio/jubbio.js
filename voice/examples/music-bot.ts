@@ -72,6 +72,7 @@ async function playNext(guildId: string) {
   
   try {
     const resource = createAudioResourceFromUrl(song.url, {
+      useYtDlp: true,
       metadata: song
     });
     

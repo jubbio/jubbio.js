@@ -109,6 +109,20 @@ export declare class Shard extends EventEmitter {
     eval<T>(script: string | ((client: any) => T)): Promise<T>;
     /**
      * Fetch a client property
+     *
+     * ⚠️ SECURITY WARNING: This method internally uses eval().
+     * While it looks safer than direct eval(), it carries the same risks.
+     * NEVER pass user input to this method - it will result in Remote Code Execution (RCE).
+     *
+     * @param prop - Property path to fetch (e.g., 'guilds.cache.size')
+     * @returns Promise resolving to the property value
+     *
+     * @example
+     * // Safe: hardcoded property
+     * const guildCount = await shard.fetchClientValue('guilds.cache.size');
+     *
+     * // UNSAFE: user input - DO NOT DO THIS!
+     * // await shard.fetchClientValue(userMessage); // RCE vulnerability!
      */
     fetchClientValue(prop: string): Promise<any>;
     private _handleMessage;
@@ -161,10 +175,27 @@ export declare class ShardingManager extends EventEmitter {
     broadcast(message: any): Promise<void[]>;
     /**
      * Broadcast an eval to all shards
+     *
+     * ⚠️ SECURITY WARNING: This method executes arbitrary code on all shard processes.
+     * NEVER pass user input to this method - it will result in Remote Code Execution (RCE).
      */
     broadcastEval<T>(script: string | ((client: any) => T)): Promise<T[]>;
     /**
      * Fetch a client value from all shards
+     *
+     * ⚠️ SECURITY WARNING: This method internally uses broadcastEval() which executes code.
+     * While it looks safer than direct eval(), it carries the same risks.
+     * NEVER pass user input to this method - it will result in Remote Code Execution (RCE).
+     *
+     * @param prop - Property path to fetch (e.g., 'guilds.cache.size')
+     * @returns Promise resolving to array of property values from all shards
+     *
+     * @example
+     * // Safe: hardcoded property
+     * const guildCounts = await manager.fetchClientValues('guilds.cache.size');
+     *
+     * // UNSAFE: user input - DO NOT DO THIS!
+     * // await manager.fetchClientValues(userMessage); // RCE vulnerability!
      */
     fetchClientValues(prop: string): Promise<any[]>;
     /**
@@ -193,10 +224,20 @@ export declare class ShardClientUtil {
     send(message: any): Promise<void>;
     /**
      * Fetch a client value from all shards
+     *
+     * ⚠️ SECURITY WARNING: This method internally uses broadcastEval() which executes code.
+     * While it looks safer than direct eval(), it carries the same risks.
+     * NEVER pass user input to this method - it will result in Remote Code Execution (RCE).
+     *
+     * @param prop - Property path to fetch (e.g., 'guilds.cache.size')
+     * @returns Promise resolving to array of property values from all shards
      */
     fetchClientValues(prop: string): Promise<any[]>;
     /**
      * Broadcast an eval to all shards
+     *
+     * ⚠️ SECURITY WARNING: This method executes arbitrary code on all shard processes.
+     * NEVER pass user input to this method - it will result in Remote Code Execution (RCE).
      */
     broadcastEval<T>(script: string | ((client: any) => T)): Promise<T[]>;
     /**

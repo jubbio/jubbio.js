@@ -64,6 +64,7 @@ export declare class Client extends EventEmitter {
     /** Voice state update handlers (for voice adapters) */
     private voiceStateHandlers;
     private voiceServerHandlers;
+    private voiceDestroyHandlers;
     /** Whether the client is currently in the login flow */
     private _loginState;
     /** Reconnect attempt counter */
